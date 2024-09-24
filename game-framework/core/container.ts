@@ -1,0 +1,212 @@
+import { assert, js } from "cc";
+import { DEBUG } from "cc/env";
+import { logger } from "./log";
+import { getClassInterface, interfaceOf } from "./misc";
+
+/**
+ * 依赖注入容器类
+ *
+ * @export
+ * @class Container
+ */
+export class Container {
+
+    /**
+     * 单例类型
+     * 
+     * 这里面的类型都是实现了ISingleton接口的类型
+     * 
+     * 接收每帧update驱动
+     *
+     * @private
+     * @static
+     * @type {Array<IGameFramework.ISingleton>}
+     * @memberof Container
+     */
+    private static _singletons: Array<IGameFramework.ISingleton> = [];
+
+    /**
+     * 有且仅有一个实例的类，但是没有实现ISingleton接口
+     * 
+     * 每帧不参与update驱动
+     *
+     * @private
+     * @static
+     * @type {Map<IGameFramework.Constructor<unknown>, Object>}
+     * @memberof Container
+     */
+    private static _otherInstances: Map<IGameFramework.Constructor<unknown>, Object> = new Map();
+
+    /**
+     * 这些是实现了特殊接口的类，可以通过接口创建的类型
+     *
+     * @private
+     * @static
+     * @type {Map<string, IGameFramework.Constructor<unknown>>}
+     * @memberof Container
+     */
+    private static _types: Map<string, IGameFramework.Constructor<unknown>> = new Map();
+
+    /**
+     * 每帧更新所有单例
+     * 
+     * 请在游戏主循环中调用此方法
+     *
+     * @static
+     * @memberof Container
+     */
+    public static update() {
+        for (let singleton of Container._singletons) {
+            singleton.onUpdate();
+        }
+    }
+
+    /**
+     * 获取单例或者其他实例
+     *
+     * @static
+     * @template T
+     * @param {IGameFramework.Constructor<T>} t
+     * @return {*}  {IGameFramework.Nullable<T>}
+     * @memberof Container
+     */
+    public static get<T extends Object>(t: IGameFramework.Constructor<T>): IGameFramework.Nullable<T> {
+        return Container._cast(t);
+    }
+
+    /**
+     * 如果实力已经注入接口类型
+     * 
+     * 则可以通过接口获取实例
+     * 
+     * 注入接口请使用implementation类装饰器
+     *
+     * @static
+     * @template T
+     * @param {string} iface
+     * @return {*}  {IGameFramework.Nullable}
+     * @memberof Container
+     */
+    public static getInterface<U extends (keyof IGameFramework)>(iface: U): IGameFramework.Nullable<IGameFramework.StringInterface<U>> {
+        for (let instance of Container._singletons) {
+            if (interfaceOf(instance, iface)) {
+                return instance as IGameFramework.StringInterface<U>;
+            }
+        }
+
+        for (let [_, other] of Container._otherInstances) {
+            if (interfaceOf(other, iface)) {
+                return other as IGameFramework.StringInterface<U>;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 是否存在单例或者其他实例
+     *
+     * @static
+     * @param { IGameFramework.Constructor<T>} t
+     * @return {*}  {boolean}
+     * @memberof Container
+     */
+    public static contains<T>(t: IGameFramework.Constructor<T>): boolean {
+        return !!Container._cast(t);
+    }
+
+    /**
+     * 注入单例
+     *
+     * @static
+     * @template T
+     * @param {IGameFramework.Constructor<T>} ctor
+     * @param {Parameters<InstanceType<typeof ctor>["onStart"]>[0]} [args]
+     * @return {*}  {T}
+     * @memberof Container
+     */
+    public static addSingleton<T extends IGameFramework.ISingleton>(ctor: IGameFramework.Constructor<T>, args?: Parameters<InstanceType<typeof ctor>["onStart"]>[0]): T {
+        const cast = Container._cast(ctor);
+        if (cast) {
+            return cast;
+        }
+
+        const instance = new ctor();
+        instance.onStart(args);
+        Container._singletons.push(instance);
+
+        DEBUG && logger.log("注入实例: " + js.getClassName(instance));
+
+        return instance;
+    }
+
+    /**
+     * 注入其他实例
+     *
+     * @static
+     * @template T
+     * @param {IGameFramework.Constructor<T>} t
+     * @return {*}  {T}
+     * @memberof Container
+     */
+    public static addInstance<T extends Object>(t: IGameFramework.Constructor<T>): T {
+        let instance = Container._cast(t);
+        if (instance) {
+            return instance;
+        }
+
+        instance = new t();
+        Container._otherInstances.set(t, instance);
+
+        DEBUG && logger.log("注入实例: " + js.getClassName(instance));
+
+        return instance;
+    }
+
+    /**
+     * 注入一个实现了某个接口的类型
+     *
+     * @static
+     * @template T
+     * @param {IGameFramework.Constructor<T>} ctor
+     * @memberof Container
+     */
+    public static registerType<T>(ctor: IGameFramework.Constructor<T>) {
+        let iface = getClassInterface(ctor);
+        DEBUG && assert(!!iface, `${js.getClassName(ctor)} must implement some interface`);
+        DEBUG && assert(Container._types.get(iface) === void 0, `${js.getClassName(ctor)} has been registered`);
+
+        Container._types.set(iface, ctor);
+    }
+
+    /**
+     * 根据接口获取实例
+     *
+     * @static
+     * @template T
+     * @param {string} iface
+     * @return {*}  {IGameFramework.Nullable<T>}
+     * @memberof Container
+     */
+    public static newType<T>(iface: string, ...args: any[]): IGameFramework.Nullable<T> {
+        let ctor = Container._types.get(iface) as IGameFramework.Nullable<IGameFramework.Constructor<T>>;
+        if (!ctor) {
+            return null;
+        }
+        return new ctor(args);
+    }
+
+    private static _cast<T>(t: IGameFramework.Constructor<T>): IGameFramework.Nullable<T> {
+        for (let instance of Container._singletons) {
+            if (instance instanceof t) {
+                return instance as T;
+            }
+        }
+
+        if (Container._otherInstances.has(t)) {
+            return Container._otherInstances.get(t) as T;
+        }
+
+        return null;
+    }
+}
