@@ -1,4 +1,5 @@
 import "cc";
+import { PhysicsGroup } from "cc";
 
 export { };
 
@@ -593,6 +594,23 @@ declare global {
 
         }
 
+        interface JoltBroadPhaseLayerSettings {
+            layers: PhysicsGroup[];
+        }
+
+        interface JoltPhysicsSettings {
+            movebroadPhaseLayer: JoltBroadPhaseLayerSettings;
+            nonMovebroadPhaseLayer: JoltBroadPhaseLayerSettings;
+            debug: boolean;
+            drawBodies: boolean;
+            drawConstraints: boolean;
+            drawShape: boolean;
+            drawBoundingBox: boolean;
+            drawWorldTransform: boolean;
+            drawCenterOfMass: boolean;
+            isDeterministic: boolean;
+        }
+
         /**
          * 环境变量
          *
@@ -604,6 +622,11 @@ declare global {
              * 是不是单机模拟环境
              */
             get isSingleMock(): boolean;
+
+            /**
+             * 获取物理配置
+             */
+            get physics(): IGameFramework.Nullable<JoltPhysicsSettings>;
 
             /**
              * 帧同步配置
