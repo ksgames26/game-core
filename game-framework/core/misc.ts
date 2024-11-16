@@ -16,6 +16,10 @@ export const PropertyGet = (function () {
     };
 })();
 
+/**
+ * 
+ * @returns 
+ */
 export const makeDefered = <T>() => {
     let resolve: (value?: T) => void = null!;
     let reject: (reason?: any) => void = null!;
@@ -30,6 +34,9 @@ export const makeDefered = <T>() => {
         promise,
     }
 }
+
+export const S2C_MESSAGE = "$s2cmsg";
+export const C2S_MESSAGE = "$c2smsg";
 
 /**
  * 等待一定的时间
