@@ -16,6 +16,29 @@ export const PropertyGet = (function () {
     };
 })();
 
+export const makeDefered = <T>() => {
+    let resolve: (value?: T) => void = null!;
+    let reject: (reason?: any) => void = null!;
+    let promise = new Promise<IGameFramework.Nullable<T>>((_resolve, _reject) => {
+        resolve = _resolve;
+        reject = _reject;
+    });
+
+    return {
+        resolve,
+        reject,
+        promise,
+    }
+}
+
+/**
+ * 等待一定的时间
+ * @param time 毫秒
+ * @returns 
+ */
+export const setTimeoutAsync = (time: number) => {
+    return new Promise((resolve) => { setTimeout(resolve, time); });
+}
 
 /**
  * 随机颜色

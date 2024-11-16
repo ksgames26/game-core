@@ -584,6 +584,10 @@ declare global {
                 eventName: TEventName
             ): boolean;
 
+            has<TEventName extends Extract<keyof TEventOverview, string>>(
+                eventName: TEventName
+            ): boolean;
+
             clearUp(e: string): void;
         }
 
