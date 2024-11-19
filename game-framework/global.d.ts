@@ -574,6 +574,12 @@ declare global {
                 priority?: number,
             ): boolean;
 
+            addAsyncListener<TEventName extends Extract<keyof TEventOverview, string>>(
+                eventName: TEventName,
+                callee: unknown,
+                priority: number,
+            ): Promise<TEventOverview[TEventName]>;
+
             removeListener<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName,
                 listener: IGameFramework.EventListener<TEventOverview[TEventName]>,
@@ -647,6 +653,15 @@ declare global {
          * @interface ITableConf
          */
         interface ITableConf {
+
+        }
+
+        /**
+         * 平台适配
+         *
+         * @interface IPalAdapter
+         */
+        interface IPalAdapter {
 
         }
 

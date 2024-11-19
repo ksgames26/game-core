@@ -35,6 +35,95 @@ export const makeDefered = <T>() => {
     }
 }
 
+const getHttp = function <T>(ok: (response: IGameFramework.Nullable<T>) => void) {
+    let xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && (xhr.status >= 200 && xhr.status < 400)) {
+            const response = xhr.response;
+            ok(response as T);
+        }
+    };
+
+    // 超时
+    xhr.ontimeout = function (ev: ProgressEvent) {
+        ok(null);
+    };
+
+    // 异常
+    xhr.onerror = function (ev: ProgressEvent) {
+        ok(null);
+    };
+
+    // 取消
+    xhr.onabort = function (ev: ProgressEvent) {
+        ok(null);
+    };
+
+    return xhr;
+}
+
+/**
+ * Http请求
+ *
+ * @export
+ * @class HttpReq
+ */
+export class HttpReq {
+    private _domain: string;
+    private _timeout: number;
+
+    public constructor(domain: string, timeout: number) {
+        this._domain = domain;
+        this._timeout = timeout;
+    }
+
+    public async requestBinary<T>(handle: string, buffer: Uint8Array): Promise<IGameFramework.Nullable<T>> {
+        let r: (value: IGameFramework.Nullable<T>) => void;
+        const p = new Promise<IGameFramework.Nullable<T>>(resolve => { r = resolve });
+        const request = getHttp((result) => {
+            r(result as T);
+        });
+
+        this.setUrlAndTimeout(handle, request);
+        request.responseType = "arraybuffer";
+        request.setRequestHeader("Content-Type", "application/octet-stream");
+
+        request.send(buffer.buffer);
+        return await p;
+    }
+
+    public async requestJson<T>(handle: string, json: unknown): Promise<IGameFramework.Nullable<T>> {
+        let r: (value: IGameFramework.Nullable<T>) => void;
+        const p = new Promise<IGameFramework.Nullable<T>>(resolve => { r = resolve });
+        const request = getHttp((result) => {
+            r(result as T);
+        });
+        this.setUrlAndTimeout(handle, request);
+        request.responseType = "json";
+        request.setRequestHeader("Content-Type", "application/json");
+        request.send(JSON.stringify(json));
+        return await p;
+    }
+
+    public async requestText(handle: string, text: string): Promise<IGameFramework.Nullable<string>> {
+        let r: (value: IGameFramework.Nullable<string>) => void;
+        const p = new Promise<IGameFramework.Nullable<string>>(resolve => { r = resolve });
+        const request = getHttp((result) => {
+            r(result as string);
+        });
+        this.setUrlAndTimeout(handle, request);
+        request.responseType = "text";
+        request.setRequestHeader("Content-Type", 'text/plain');
+        request.send(text);
+        return await p;
+    }
+
+    private setUrlAndTimeout(handle: string, request: XMLHttpRequest): void {
+        request.open("POST", this._domain + handle, true);
+        request.timeout = this._timeout;
+    }
+}
+
 export const S2C_MESSAGE = "$s2cmsg";
 export const C2S_MESSAGE = "$c2smsg";
 
