@@ -619,6 +619,7 @@ declare global {
             drawWorldTransform: boolean;
             drawCenterOfMass: boolean;
             isDeterministic: boolean;
+            autoSimulation: boolean;
         }
 
         /**
