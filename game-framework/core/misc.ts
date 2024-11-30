@@ -20,7 +20,7 @@ export const PropertyGet = (function () {
  * 
  * @returns 
  */
-export const makeDefered = <T>() => {
+export const makeDeferred = <T>() => {
     let resolve: (value?: T) => void = null!;
     let reject: (reason?: any) => void = null!;
     let promise = new Promise<IGameFramework.Nullable<T>>((_resolve, _reject) => {
@@ -32,6 +32,28 @@ export const makeDefered = <T>() => {
         resolve,
         reject,
         promise,
+    }
+}
+
+export class Deferred<T = any> {
+    public promise: Promise<T>;
+
+    public resolve: (t: T) => void = null!;
+    public reject: Function = null!;
+
+    constructor() {
+        this.promise = new Promise<T>((resolve, reject) => {
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+    }
+
+    public then(func: (value: T) => any) {
+        return this.promise.then(func);
+    }
+
+    public catch(func: (value: any) => any) {
+        return this.promise.catch(func);
     }
 }
 
