@@ -36,16 +36,34 @@ export const makeDeferred = <T>() => {
 }
 
 export class Deferred<T = any> {
+    public static PENDING = "PENDING";
+    public static FULFILLED = "FULFILLED";
+    public static REJECTED = "REJECTED";
+
     public promise: Promise<T>;
 
-    public resolve: (t: T) => void = null!;
-    public reject: Function = null!;
+    private _resolve: (t: T) => void = null!;
+    private _reject: Function = null!;
+
+    public state: string = Deferred.PENDING;
 
     constructor() {
         this.promise = new Promise<T>((resolve, reject) => {
-            this.resolve = resolve;
-            this.reject = reject;
+            this._resolve = resolve;
+            this._reject = reject;
         });
+    }
+
+    public fulfilled(value: T) {
+        if (this.state !== Deferred.PENDING) return;
+        this.state = Deferred.FULFILLED;
+        this._resolve(value);
+    }
+
+    public rejected(reason: any) {
+        if (this.state !== Deferred.PENDING) return;
+        this.state = Deferred.REJECTED;
+        this._reject(reason);
     }
 
     public then(func: (value: T) => any) {
