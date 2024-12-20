@@ -1,5 +1,5 @@
-import { CCClass, Color, Component, EventTouch, Node, Rect, assetManager, view as ccview, error, game, isValid, js, screen, sys, warn } from "cc";
-import { PREVIEW } from "cc/env";
+import { CCClass, Color, Component, EventTouch, Node, Rect, assetManager, view as ccview, director, error, game, isValid, js, screen, sys, warn } from "cc";
+import { PREVIEW,DEBUG } from "cc/env";
 import { ArgumentsTypeError } from "./error";
 
 export const supportReflect = typeof Reflect !== "undefined";
@@ -33,6 +33,49 @@ export const makeDeferred = <T>() => {
         reject,
         promise,
     }
+}
+
+export const utils = {
+    get isPc(): boolean {
+        return sys.platform === sys.Platform.WIN32 ||
+            sys.platform === sys.Platform.MACOS ||
+            sys.platform === sys.Platform.DESKTOP_BROWSER ||
+            sys.os === sys.OS.WINDOWS ||
+            sys.os === sys.OS.LINUX ||
+            sys.os === sys.OS.OSX;
+    },
+
+    // 计算到根节点的距离
+    getDistanceToRoot(node: Node) {
+        let distance = 0;
+        let current = node;
+        while (current.parent) {
+            distance++;
+            current = current.parent;
+        }
+        return distance;
+    },
+
+    getCameraComponent<T extends Component>(comp: IGameFramework.Constructor<T>) {
+        const cameras = director.root!.cameraList;
+        for (let ia = 0; ia < cameras.length; ++ia) {
+            const camera = cameras[ia];
+            const com = camera.node.getComponent(comp);
+            if (com) {
+                return com;
+            }
+        }
+    },
+
+    getMainCamera(name: string = "Main Camera") {
+        const cameras = director.root!.cameraList;
+        for (let ia = 0; ia < cameras.length; ++ia) {
+            const camera = cameras[ia];
+            if (camera.node.name === name) {
+                return camera;
+            }
+        }
+    },
 }
 
 export class Deferred<T = any> {
