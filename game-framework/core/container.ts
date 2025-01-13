@@ -1,5 +1,6 @@
 import { assert, js } from "cc";
 import { DEBUG } from "cc/env";
+import { SortedSet } from "db://game-framework/game-framework";
 import { logger } from "./log";
 import { getClassInterface, interfaceOf } from "./misc";
 
@@ -23,7 +24,11 @@ export class Container {
      * @type {Array<IGameFramework.ISingleton>}
      * @memberof Container
      */
-    private static _singletons: Array<IGameFramework.ISingleton> = [];
+    private static _singletons: SortedSet<IGameFramework.ISingleton> = new SortedSet<IGameFramework.ISingleton>((a, b) => {
+        let aOrder = a.updateOrder ?? 0;
+        let bOrder = b.updateOrder ?? 0;
+        return aOrder - bOrder;
+    });
 
     /**
      * 有且仅有一个实例的类，但是没有实现ISingleton接口
@@ -57,7 +62,7 @@ export class Container {
      */
     public static update() {
         for (let singleton of Container._singletons) {
-            singleton.onUpdate();
+            singleton.enableUpdate && singleton.onUpdate();
         }
     }
 
@@ -133,7 +138,7 @@ export class Container {
 
         const instance = new ctor();
         instance.onStart(args);
-        Container._singletons.push(instance);
+        Container._singletons.add(instance);
 
         DEBUG && logger.log("注入实例: " + js.getClassName(instance));
 

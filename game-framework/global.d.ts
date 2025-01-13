@@ -1,5 +1,5 @@
 import "cc";
-import { PhysicsGroup } from "cc";
+import { physics } from "cc";
 
 export { };
 
@@ -48,7 +48,7 @@ declare module "cc" {
     }
 
     export namespace __private {
-        export interface _cocos_core_data_utils_attribute_defines__IExposedAttributes_userData extends IGameFramework.PropertypeDefine {
+        export interface _cocos_core_data_utils_attribute_defines__IExposedAttributesUserData extends IGameFramework.PropertypeDefine {
 
         }
 
@@ -605,7 +605,7 @@ declare global {
         }
 
         interface JoltBroadPhaseLayerSettings {
-            layers: PhysicsGroup[];
+            layers: physics.PhysicsGroup[];
         }
 
         interface JoltPhysicsSettings {
@@ -770,6 +770,18 @@ declare global {
              * 每帧驱动单例对象
              */
             onUpdate(): void;
+
+            /**
+             * 是否启用更新
+             */
+            enableUpdate:boolean;
+            
+            /**
+             * 更新排序
+             * 
+             * 默认按照插入顺序执行
+             */
+            updateOrder:number;
         }
 
 
@@ -802,7 +814,6 @@ declare global {
              * @todo 暂时不支持 3.8.5 发布以后开始支持
              */
             fixScaled: boolean;
-
 
             /**
              * 是否修正微信右上角

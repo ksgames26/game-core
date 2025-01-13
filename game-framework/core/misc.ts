@@ -685,6 +685,10 @@ export class RandomGenerator {
         return this._seed;
     }
 
+    public set seed(value: number) {
+        this._seed = value;
+    }
+
     public nextInt(max: number = 1, min: number = 0): number {
         return Math.floor(this.next(max, min));
     }
