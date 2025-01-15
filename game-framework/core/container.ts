@@ -1,6 +1,6 @@
 import { assert, js } from "cc";
 import { DEBUG } from "cc/env";
-import { SortedSet } from "db://game-framework/game-framework";
+import { SortedSet } from "../structures/sorted-set";
 import { logger } from "./log";
 import { getClassInterface, interfaceOf } from "./misc";
 
