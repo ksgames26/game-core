@@ -6,7 +6,6 @@
     "author": "v",
     "editor": ">=3.8.3",
     "scripts": {
-        "preinstall": "node ./scripts/preinstall.js",
         "build": "tsc",
         "watch": "tsc -w"
     },
