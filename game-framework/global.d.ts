@@ -774,14 +774,14 @@ declare global {
             /**
              * 是否启用更新
              */
-            enableUpdate:boolean;
-            
+            enableUpdate: boolean;
+
             /**
              * 更新排序
              * 
              * 默认按照插入顺序执行
              */
-            updateOrder:number;
+            updateOrder: number;
         }
 
 
@@ -1176,7 +1176,7 @@ declare global {
              * 移动到任务的下一步
              */
             moveNext(): void;
-            
+
             /**
              * 是否有效
 

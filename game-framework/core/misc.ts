@@ -1,4 +1,4 @@
-import { CCClass, Color, Component, EventTouch, Node, Rect, assetManager, view as ccview, director, error, game, isValid, js, screen, sys, warn } from "cc";
+import { assetManager, CCClass, view as ccview, Color, Component, director, error, EventTouch, game, isValid, js, Node, Rect, screen, sys, warn } from "cc";
 import { PREVIEW } from "cc/env";
 import { ArgumentsTypeError } from "./error";
 

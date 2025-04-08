@@ -12,6 +12,8 @@ import { getClassInterface, interfaceOf } from "./misc";
  */
 export class Container {
 
+    private static _injectables: Set<IGameFramework.Constructor<unknown>> = new Set();
+
     /**
      * 单例类型
      * 
@@ -145,29 +147,6 @@ export class Container {
         return instance;
     }
 
-     /**
-     * 自动注册实例
-     *
-     * @static
-     * @template TargetPath
-     * @memberof Container
-     */
-     public static autoRegister<T extends Object>(): (target: IGameFramework.Constructor<T>) => IGameFramework.Constructor<T> {
-        if (EDITOR) {
-            if (!EDITOR_NOT_IN_PREVIEW) {
-                return function (target: IGameFramework.Constructor<T>) {
-                    Container.addInstance(target);
-                    return target;
-                };
-            }
-        }
-
-        return function (target: IGameFramework.Constructor<T>) {
-            Container.addInstance(target);
-            return target;
-        };
-    }
-
     /**
      * 注入其他实例
      *
@@ -189,6 +168,46 @@ export class Container {
         DEBUG && logger.log("注入实例: " + js.getClassName(instance));
 
         return instance;
+    }
+
+    /**
+     * 自动注册实例
+     *
+     * @static
+     * @template TargetPath
+     * @memberof Container
+     */
+    public static injectable<T extends Object>(): (target: IGameFramework.Constructor<T>) => IGameFramework.Constructor<T> {
+        const invoke = (target: IGameFramework.Constructor<T>) => {
+            Container._injectables.add(target);
+            return target;
+        };
+
+        if (EDITOR) {
+            if (!EDITOR_NOT_IN_PREVIEW) {
+                return invoke;
+            }
+
+            return (target: IGameFramework.Constructor<T>) => {
+                return target;
+            };
+        }
+
+        return invoke;
+    }
+
+    /**
+     * 注册所有injectables
+     *
+     * @static
+     * @memberof Container
+     */
+    public static registerInjectables() {
+        for (let ctor of Container._injectables) {
+            Container.addInstance(ctor as IGameFramework.Constructor<Object>);
+        }
+
+        Container._injectables.clear();
     }
 
     /**
@@ -238,3 +257,4 @@ export class Container {
         return null;
     }
 }
+
