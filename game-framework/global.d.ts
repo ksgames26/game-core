@@ -1176,6 +1176,12 @@ declare global {
              * 移动到任务的下一步
              */
             moveNext(): void;
+            
+            /**
+             * 是否有效
+
+             */
+            isValid(): boolean;
         }
 
         /**

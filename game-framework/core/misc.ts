@@ -1,5 +1,5 @@
 import { CCClass, Color, Component, EventTouch, Node, Rect, assetManager, view as ccview, director, error, game, isValid, js, screen, sys, warn } from "cc";
-import { PREVIEW,DEBUG } from "cc/env";
+import { PREVIEW } from "cc/env";
 import { ArgumentsTypeError } from "./error";
 
 export const supportReflect = typeof Reflect !== "undefined";
