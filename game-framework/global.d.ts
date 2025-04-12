@@ -990,7 +990,7 @@ declare global {
              *
              * @memberof ITaskActuator
              */
-            progressInvoke: Nullable<(progress: number) => void>;
+            progressInvoke: Nullable<(progress: { progress: number, name: string }) => void>;
         }
 
         /**
