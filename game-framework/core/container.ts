@@ -1,3 +1,4 @@
+
 import { assert, js } from "cc";
 import { DEBUG, EDITOR, EDITOR_NOT_IN_PREVIEW } from "cc/env";
 import { SortedSet } from "../structures/sorted-set";
@@ -207,6 +208,7 @@ export class Container {
             Container.addInstance(ctor as IGameFramework.Constructor<Object>);
         }
 
+        // 清空所有注册相关的缓存
         Container._injectables.clear();
     }
 
@@ -256,5 +258,6 @@ export class Container {
 
         return null;
     }
+
 }
 

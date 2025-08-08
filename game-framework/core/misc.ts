@@ -1,5 +1,5 @@
 import { assetManager, CCClass, view as ccview, Color, Component, director, error, EventTouch, game, isValid, js, Node, Rect, screen, sys, warn } from "cc";
-import { PREVIEW } from "cc/env";
+import { EDITOR, EDITOR_NOT_IN_PREVIEW, PREVIEW } from "cc/env";
 import { ArgumentsTypeError } from "./error";
 
 export const supportReflect = typeof Reflect !== "undefined";
@@ -15,6 +15,15 @@ export const PropertyGet = (function () {
         return (<any>target)[key];
     };
 })();
+
+/** 编辑器环境 */
+export const isEditor = EDITOR;
+/** 编辑器内预览 */
+export const isEditorPreview = EDITOR && !EDITOR_NOT_IN_PREVIEW;
+/** 编辑器场景 */
+export const isEditorScene = EDITOR && EDITOR_NOT_IN_PREVIEW;
+/** 浏览器预览 */
+export const isBrowserPreview = !EDITOR && PREVIEW;
 
 /**
  * 
@@ -369,10 +378,10 @@ export function isEmptyStr(str: IGameFramework.Nullable<string>): boolean {
  */
 export function getUrlParam(urlStr: string, urlKey: string): string {
     if (isEmptyStr(urlStr)) return "";
-    const url = new URL(urlStr)
-    const reg = new RegExp('[\?\&]' + urlKey + '=([^\&]*)(\&?)', 'i')
-    const r = url.search.match(reg);
-    return r ? r[1] : ''
+    const search = urlStr.split('?')[1] || "";
+    const reg = new RegExp('(^|&)' + urlKey + '=([^&]*)(&|$)', 'i');
+    const r = search.match(reg);
+    return r ? decodeURIComponent(r[2]) : "";
 }
 
 /**
@@ -519,7 +528,7 @@ const updateAdaptResult = () => {
     const wh = ccview.getViewportRect();
     whRect.x = wh.x;
     whRect.y = wh.y;
-    whRect.width = wh.width / ccview.getScaleX();;
+    whRect.width = wh.width / ccview.getScaleX();
     whRect.height = wh.height / ccview.getScaleY();
 
     // 发送事件的时候不能太频繁

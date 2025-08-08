@@ -1,11 +1,12 @@
 import { error, log, warn } from "cc";
-import { EDITOR } from "cc/env";
 
-interface Error {
-    name: string;
-    message: string;
-    stack?: string;
-}
+// 日志配置存储 
+const loggers = new Map<string, {
+    debug: boolean;
+    info: boolean;
+    warn: boolean;
+    error: boolean;
+}>();
 
 /**
  * 日志等级
@@ -32,12 +33,106 @@ export const enum LoggerType {
     CUSTOME,
     COCOS,
     File,
+    HTTP,
 }
 
-const loggers = new Map<string, Logger>();
-let type = LoggerType.COCOS;
+let type = LoggerType.CONSOLE;
 let level = LoggerLevel.INFO;
+let _globalEnabled = true; // 全局日志开关
 
+// HTTP日志配置
+interface HttpLogConfig {
+    url: string;
+    method?: 'POST' | 'PUT';
+    headers?: Record<string, string>;
+    batchSize?: number;
+    flushInterval?: number;
+    enabled?: boolean;
+}
+
+let httpConfig: HttpLogConfig | null = null;
+let logBuffer: Array<{ level: string; tag: string; message: any[]; timestamp: number }> = [];
+let flushTimer: NodeJS.Timeout | null = null;
+
+/**
+ * 发送日志到HTTP服务器
+ */
+async function sendLogsToHttp(logs: Array<{ level: string; tag: string; message: any[]; timestamp: number }>) {
+    if (!httpConfig || !httpConfig.enabled || logs.length === 0) return;
+
+    try {
+        const xhr = new XMLHttpRequest();
+        xhr.open(httpConfig.method || 'POST', httpConfig.url, true);
+
+        // 设置请求头
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (httpConfig.headers) {
+            for (const key in httpConfig.headers) {
+                xhr.setRequestHeader(key, httpConfig.headers[key]);
+            }
+        }
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status !== 200) {
+                console.error('Failed to send logs to server:', xhr.statusText);
+            }
+        };
+
+        const payload = {
+            logs: logs.map(log => ({
+                level: log.level,
+                tag: log.tag,
+                message: log.message,
+                timestamp: log.timestamp,
+                userAgent: navigator.userAgent,
+                url: window.location.href
+            }))
+        };
+
+        xhr.send(JSON.stringify(payload));
+    } catch (error) {
+        console.error('Error sending logs to server:', error);
+    }
+}
+
+/**
+ * 刷新日志缓冲区
+ */
+function flushLogBuffer() {
+    if (logBuffer.length > 0) {
+        sendLogsToHttp([...logBuffer]);
+        logBuffer = [];
+    }
+}
+
+/**
+ * 添加日志到缓冲区
+ */
+function addLogToBuffer(level: string, tag: string, message: any[]) {
+    if (!httpConfig || !httpConfig.enabled) return;
+
+    logBuffer.push({
+        level,
+        tag,
+        message,
+        timestamp: Date.now()
+    });
+
+    // 如果达到批次大小，立即发送
+    if (logBuffer.length >= (httpConfig.batchSize || 10)) {
+        flushLogBuffer();
+    }
+
+    // 设置定时器定期发送
+    if (flushTimer) {
+        clearTimeout(flushTimer);
+    }
+    flushTimer = setTimeout(flushLogBuffer, httpConfig.flushInterval || 5000);
+}
+
+/**
+ * 日志等级
+ */
 function consoleTable<T extends object>(data: T[], properties?: (keyof T)[], colors?: Map<string, string>): void {
     if (!data || data.length === 0) {
         console.log('No data to display.');
@@ -86,143 +181,140 @@ function consoleTable<T extends object>(data: T[], properties?: (keyof T)[], col
     }
 }
 
-class PrivateLogger {
-    private static stackTrace = function () {
-        let obj = {};
-        //@ts-ignore
-        Error.captureStackTrace(obj, PrivateLogger.stackTrace)
-        return (<Error>obj).stack
-    }
+/**
+ * 统一的日志打印函数
+ */
+function printLog(): (...info: any[]) => void {
+    if (!_globalEnabled) return function () { };
 
-    private static getLine(stack: string) {
-        let matchResult = stack.match(/\(.*?\)|\s.+/g) || []
-        let arr = matchResult.map((it: string) => {
-            return it.split(' ').pop()!.replace(/\(|\)/g, '')
-        })
-        return arr[2] ?? ''
-    }
-
-    public static log(...info: any[]) {
-        switch (type) {
-            case LoggerType.CUSTOME:
-                PrivateLogger.customLog(info);
-                break;
-            case LoggerType.COCOS:
-                PrivateLogger.cocosLog(info);
-                break;
-            default:
-                PrivateLogger.cocosLog(info);
-                break;
-        }
-    }
-
-    private static customLog(info: any[]) {
-        //@ts-ignore
-        if (!Error.captureStackTrace) {
-            return PrivateLogger.out(info);
-        }
-
-        let stack = PrivateLogger.stackTrace() || '';
-        let matchResult = PrivateLogger.getLine(stack);
-
-        if (EDITOR) {
-            matchResult = "file:///" + matchResult.split("file:/")[2];
-        }
-
-        let line = matchResult;
-        //@ts-ignore
-        arguments[arguments.length - 1] += '  ' + line;
-        //@ts-ignore
-        log.apply(console, arguments);
-    }
-
-    private static cocosLog(info: any[]) {
-        log.apply(null, info);
-    }
-
-    private static out(...info: any[]) {
-        log(info);
+    switch (type) {
+        case LoggerType.CONSOLE:
+            return console.log.bind(console, '%c[日志]', 'color: white; background-color: #28a745; ');
+        case LoggerType.HTTP:
+            return (...info: any[]) => {
+                addLogToBuffer('LOG', 'GLOBAL', info);
+            };
+        case LoggerType.COCOS:
+        default:
+            return log;
     }
 }
 
 /**
- * 日志类
- *
- * @export
- * @class Logger
+ * 统一的警告打印函数
  */
-export class Logger {
+function printWarn(): (...info: any[]) => void {
+    if (!_globalEnabled) return function () { };
 
-    /**
-     * 获取日志实例
-     *
-     * @static
-     * @param {string} name 日志名称
-     * @returns {Logger} 日志实例
-     * @memberof Logger
-     */
-    public static getLogger(name: string): Logger {
-        if (loggers.has(name)) {
-            return loggers.get(name)!;
+    switch (type) {
+        case LoggerType.CONSOLE:
+            return console.warn.bind(console, '%c[警告]', 'color: white; background-color: #ffc107; ');
+        case LoggerType.HTTP:
+            return (...info: any[]) => {
+                addLogToBuffer('WARN', 'GLOBAL', info);
+            };
+        case LoggerType.COCOS:
+        default:
+            return warn;
+    }
+}
+
+/**
+ * 统一的错误打印函数
+ */
+function printError(): (...info: any[]) => void {
+    if (!_globalEnabled) return function () { };
+
+    switch (type) {
+        case LoggerType.CONSOLE:
+            return console.error.bind(console, '%c[错误]', 'color: white; background-color: #dc3545; ');
+        case LoggerType.HTTP:
+            return (...info: any[]) => {
+                addLogToBuffer('ERROR', 'GLOBAL', info);
+            };
+        case LoggerType.COCOS:
+        default:
+            return error;
+    }
+}
+
+/**
+ * 统一的表格打印函数
+ */
+function printTable(): (...args: any[]) => void {
+    if (!_globalEnabled) return function () { };
+    return console.table.bind(console);
+}
+
+/**
+ * 日志接口
+ */
+export interface ILogger {
+    readonly tag: string;
+    debug(...info: any[]): void;
+    info(...info: any[]): void;
+    warn(...info: any[]): void;
+    error(...info: any[]): void;
+}
+
+/**
+ * 获取日志实例
+ *
+ * @param tag 日志标签
+ * @returns 日志实例
+ */
+export function getLogger(tag: string): ILogger {
+    // 获取或创建配置
+    if (!loggers.has(tag)) {
+        loggers.set(tag, {
+            debug: level >= LoggerLevel.DEBUG,
+            info: level >= LoggerLevel.INFO,
+            warn: level >= LoggerLevel.WARN,
+            error: level >= LoggerLevel.ERROR
+        });
+    }
+
+    const config = loggers.get(tag)!;
+
+    return {
+        tag,
+        debug(...info: any[]) {
+            if (config.debug) {
+                if (type === LoggerType.HTTP) {
+                    addLogToBuffer('DEBUG', tag, info);
+                } else {
+                    printLog()(tag, ...info);
+                }
+            }
+        },
+        info(...info: any[]) {
+            if (config.info) {
+                if (type === LoggerType.HTTP) {
+                    addLogToBuffer('INFO', tag, info);
+                } else {
+                    printLog()(tag, ...info);
+                }
+            }
+        },
+        warn(...info: any[]) {
+            if (config.warn) {
+                if (type === LoggerType.HTTP) {
+                    addLogToBuffer('WARN', tag, info);
+                } else {
+                    printWarn()(tag, ...info);
+                }
+            }
+        },
+        error(...info: any[]) {
+            if (config.error) {
+                if (type === LoggerType.HTTP) {
+                    addLogToBuffer('ERROR', tag, info);
+                } else {
+                    printError()(tag, ...info);
+                }
+            }
         }
-        let logger = new Logger(name);
-        loggers.set(name, logger);
-        return logger;
-    }
-
-    private _name: string;
-    private _level: LoggerLevel = LoggerLevel.DEBUG;
-    constructor(name: string) {
-        this._name = name;
-    }
-
-    /**
-     * 输出调试信息
-     *
-     * @param {...any[]} info
-     * @memberof Logger
-     */
-    public debug(info: any[]) {
-        if (this._level <= LoggerLevel.DEBUG) {
-            logger.log.apply(null, ['[DEBUG]', this._name, ...info]);
-        }
-    }
-
-    /**
-     * 输出信息
-     *
-     * @param {...any[]} info
-     * @memberof Logger
-     */
-    public info(...info: any[]) {
-        if (this._level <= LoggerLevel.INFO) {
-            logger.log.apply(null, ['[INFO]', this._name, ...info]);
-        }
-    }
-
-    /**
-     * 输出警告信息
-     *
-     * @param {...any[]} info
-     * @memberof Logger
-     */
-    public warn(...info: any[]) {
-        if (this._level <= LoggerLevel.WARN) {
-            logger.log.apply(null, ['[WARN]', this._name, ...info]);
-        }
-    }
-
-    /**
-     * 输出错误信息
-     *
-     * @param {...any[]} info
-     * @memberof Logger
-     */
-    public error(...info: any[]) {
-        if (this._level <= LoggerLevel.ERROR) {
-            logger.log.apply(null, ['[ERROR]', this._name, ...info]);
-        }
-    }
+    };
 }
 
 /**
@@ -230,13 +322,138 @@ export class Logger {
  */
 export const logger = {
 
+    initialize: (configs?: {
+        global?: { enabled?: boolean },
+        http?: HttpLogConfig,
+        loggers?: Record<string, {
+            debug?: boolean;
+            info?: boolean;
+            warn?: boolean;
+            error?: boolean;
+            enable?: boolean;
+        }>,
+    }) => {
+        if (!configs) return;
+
+        // 设置全局开关
+        if (configs.global !== undefined) {
+            _globalEnabled = configs.global.enabled ?? true;
+        }
+
+        // 设置HTTP配置
+        if (configs.http) {
+            httpConfig = {
+                batchSize: 10,
+                flushInterval: 5000,
+                method: 'POST',
+                enabled: true,
+                ...configs.http
+            };
+        }
+
+        // 设置各个日志器的配置
+        if (configs.loggers) {
+            Object.entries(configs.loggers).forEach(([tag, config]) => {
+                const existing = loggers.get(tag) || {
+                    debug: level >= LoggerLevel.DEBUG,
+                    info: level >= LoggerLevel.INFO,
+                    warn: level >= LoggerLevel.WARN,
+                    error: level >= LoggerLevel.ERROR
+                };
+
+                // 更新现有配置
+                if (!config.enable) { 
+                    existing.debug = false;
+                    existing.info = false;
+                    existing.warn = false;
+                    existing.error = false;
+                }
+
+                loggers.set(tag, {
+                    debug: config.debug ?? existing.debug,
+                    info: config.info ?? existing.info,
+                    warn: config.warn ?? existing.warn,
+                    error: config.error ?? existing.error
+                });
+            });
+        }
+    },
+
+    /**
+     * 设置指定标签日志的开关状态
+     * @param tag 日志标签
+     * @param levelType 日志级别类型
+     * @param enabled 是否启用
+     */
+    setLoggerEnabled: (tag: string, levelType: 'debug' | 'info' | 'warn' | 'error', enabled: boolean) => {
+        const existing = loggers.get(tag) || { debug: true, info: true, warn: true, error: true };
+        existing[levelType] = enabled;
+        loggers.set(tag, existing);
+    },
+
+    /**
+     * 设置指定标签所有级别的开关状态
+     * @param tag 日志标签
+     * @param enabled 是否启用
+     */
+    setLoggerAllEnabled: (tag: string, enabled: boolean) => {
+        loggers.set(tag, {
+            debug: enabled,
+            info: enabled,
+            warn: enabled,
+            error: enabled
+        });
+    },
+
+    /**
+     * 获取指定标签日志的配置
+     * @param tag 日志标签
+     */
+    getLoggerConfig: (tag: string) => {
+        return loggers.get(tag) || { debug: true, info: true, warn: true, error: true };
+    },
+
+    /**
+     * 设置全局日志开关
+     * @param enabled 是否启用
+     */
+    setGlobalEnabled: (enabled: boolean) => {
+        _globalEnabled = enabled;
+    },
+
+    /**
+     * 获取全局日志开关状态
+     */
+    getGlobalEnabled: () => _globalEnabled,
+
+    /**
+     * 清除所有日志配置
+     */
+    clearLoggerConfigs: () => {
+        loggers.clear();
+    },
+
     /**
      * 输出调试信息
      */
-    log: log,
-    warn: warn,
-    error: error,
-    table: consoleTable,
+    get log(): (...info: any[]) => void {
+        if (level < LoggerLevel.INFO) return function () { };
+        return printLog();
+    },
+
+    get warn(): (...info: any[]) => void {
+        if (level < LoggerLevel.WARN) return function () { };
+        return printWarn();
+    },
+
+    get error(): (...info: any[]) => void {
+        if (level < LoggerLevel.ERROR) return function () { };
+        return printError();
+    },
+
+    get table(): (...args: any[]) => void {
+        return printTable();
+    },
 
     /**
      * 日志级别
@@ -254,16 +471,14 @@ export const logger = {
      */
     set level(value: LoggerLevel) {
         level = value;
-        if (level == LoggerLevel.NONE) {
-            this.log = function () { };
-            this.warn = function () { };
-            this.error = function () { };
-            this.table = function () { };
-        } else {
-            this.error = type == LoggerType.CONSOLE ? console.error : PrivateLogger.log;
-            this.warn = type == LoggerType.CONSOLE ? console.warn : PrivateLogger.log;
-            this.log = type == LoggerType.CONSOLE ? console.log : PrivateLogger.log;
-        }
+
+        // 更新所有现有 logger 的配置
+        loggers.forEach((config, tag) => {
+            config.debug = level >= LoggerLevel.DEBUG;
+            config.info = level >= LoggerLevel.INFO;
+            config.warn = level >= LoggerLevel.WARN;
+            config.error = level >= LoggerLevel.ERROR;
+        });
     },
 
     /**
@@ -278,14 +493,36 @@ export const logger = {
      */
     set type(value: LoggerType) {
         type = value;
-        if (type == LoggerType.CONSOLE && level != LoggerLevel.NONE) {
-            this.log = console.log;
-            this.warn = console.warn;
-            this.error = console.error;
-        } else {
-            this.log = PrivateLogger.log;
-            this.warn = PrivateLogger.log;
-            this.error = PrivateLogger.log;
+        
+        // 如果切换到非HTTP模式，先刷新缓冲区
+        if (value !== LoggerType.HTTP && logBuffer.length > 0) {
+            flushLogBuffer();
         }
-    }
+    },
+
+    /**
+     * 配置HTTP日志传输
+     * @param config HTTP配置
+     */
+    configureHttp: (config: HttpLogConfig) => {
+        httpConfig = {
+            batchSize: 10,
+            flushInterval: 5000,
+            method: 'POST',
+            enabled: true,
+            ...config
+        };
+    },
+
+    /**
+     * 立即发送所有缓存的日志
+     */
+    flushLogs: () => {
+        flushLogBuffer();
+    },
+
+    /**
+     * 获取HTTP配置
+     */
+    getHttpConfig: () => httpConfig,
 }
