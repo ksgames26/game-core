@@ -1,4 +1,5 @@
 import "cc";
+import { physics } from "cc";
 
 export { };
 
@@ -47,7 +48,7 @@ declare module "cc" {
     }
 
     export namespace __private {
-        export interface _cocos_core_data_utils_attribute_defines__IExposedAttributes_userData extends IGameFramework.PropertypeDefine {
+        export interface _cocos_core_data_utils_attribute_defines__IExposedAttributesUserData extends IGameFramework.PropertypeDefine {
 
         }
 
@@ -531,7 +532,7 @@ declare global {
                 callee: unknown,
                 count?: number,
                 priority?: number,
-            ): boolean;
+            ): IGameFramework.Nullable<Listener>;
 
             addListener<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName,
@@ -539,7 +540,7 @@ declare global {
                 callee: unknown,
                 count?: number,
                 priority?: number,
-            ): boolean;
+            ): IGameFramework.Nullable<Listener>;
 
             addListener<TEventName extends string>(
                 eventName: Exclude<TEventName, keyof TEventOverview>,
@@ -547,7 +548,7 @@ declare global {
                 callee: unknown,
                 count?: number,
                 priority?: number,
-            ): boolean;
+            ): IGameFramework.Nullable<Listener>;
 
             addAutoListener<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName,
@@ -555,7 +556,7 @@ declare global {
                 callee: unknown,
                 count?: number,
                 priority?: number,
-            ): boolean;
+            ): IGameFramework.Nullable<Listener>;
 
             addAutoListener<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName,
@@ -563,7 +564,7 @@ declare global {
                 callee: unknown,
                 count?: number,
                 priority?: number,
-            ): boolean;
+            ): IGameFramework.Nullable<Listener>;
 
             addAutoListener<TEventName extends string>(
                 eventName: Exclude<TEventName, keyof TEventOverview>,
@@ -571,7 +572,13 @@ declare global {
                 callee: unknown,
                 count?: number,
                 priority?: number,
-            ): boolean;
+            ): IGameFramework.Nullable<Listener>;
+
+            addAsyncListener<TEventName extends Extract<keyof TEventOverview, string>>(
+                eventName: TEventName,
+                callee: unknown,
+                priority: number,
+            ): Promise<TEventOverview[TEventName]>;
 
             removeListener<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName,
@@ -580,6 +587,10 @@ declare global {
             ): boolean;
 
             removeListeners<TEventName extends Extract<keyof TEventOverview, string>>(
+                eventName: TEventName
+            ): boolean;
+
+            has<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName
             ): boolean;
 
@@ -593,6 +604,24 @@ declare global {
 
         }
 
+        interface JoltBroadPhaseLayerSettings {
+            layers: physics.PhysicsGroup[];
+        }
+
+        interface JoltPhysicsSettings {
+            movebroadPhaseLayer: JoltBroadPhaseLayerSettings;
+            nonMovebroadPhaseLayer: JoltBroadPhaseLayerSettings;
+            debug: boolean;
+            drawBodies: boolean;
+            drawConstraints: boolean;
+            drawShape: boolean;
+            drawBoundingBox: boolean;
+            drawWorldTransform: boolean;
+            drawCenterOfMass: boolean;
+            isDeterministic: boolean;
+            autoSimulation: boolean;
+        }
+
         /**
          * 环境变量
          *
@@ -604,6 +633,11 @@ declare global {
              * 是不是单机模拟环境
              */
             get isSingleMock(): boolean;
+
+            /**
+             * 获取物理配置
+             */
+            get physics(): IGameFramework.Nullable<JoltPhysicsSettings>;
 
             /**
              * 帧同步配置
@@ -620,6 +654,15 @@ declare global {
          * @interface ITableConf
          */
         interface ITableConf {
+
+        }
+
+        /**
+         * 平台适配
+         *
+         * @interface IPalAdapter
+         */
+        interface IPalAdapter {
 
         }
 
@@ -727,6 +770,18 @@ declare global {
              * 每帧驱动单例对象
              */
             onUpdate(): void;
+
+            /**
+             * 是否启用更新
+             */
+            enableUpdate: boolean;
+
+            /**
+             * 更新排序
+             * 
+             * 默认按照插入顺序执行
+             */
+            updateOrder: number;
         }
 
 
@@ -759,7 +814,6 @@ declare global {
              * @todo 暂时不支持 3.8.5 发布以后开始支持
              */
             fixScaled: boolean;
-
 
             /**
              * 是否修正微信右上角
@@ -936,7 +990,7 @@ declare global {
              *
              * @memberof ITaskActuator
              */
-            progressInvoke: Nullable<(progress: number) => void>;
+            progressInvoke: Nullable<(progress: { progress: number, name: string }) => void>;
         }
 
         /**
@@ -1122,6 +1176,12 @@ declare global {
              * 移动到任务的下一步
              */
             moveNext(): void;
+
+            /**
+             * 是否有效
+
+             */
+            isValid(): boolean;
         }
 
         /**
