@@ -18,9 +18,8 @@ export class CancellationToken implements IGameFramework.ICancellationToken {
     }
 
     public cancel(): void {
-        if (!this._isCancelled) {
-            this._isCancelled = true;
-        }
+        if (this._isCancelled) return;
+        this._isCancelled = true;
 
         if (this._parent) {
             this._parent.cancel();

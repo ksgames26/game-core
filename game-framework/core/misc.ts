@@ -1,4 +1,4 @@
-import { CCClass, Color, Component, EventTouch, Node, Rect, assetManager, view as ccview, error, game, isValid, js, screen, sys, warn } from "cc";
+import { assetManager, CCClass, view as ccview, Color, Component, director, error, EventTouch, game, isValid, js, Node, Rect, screen, sys, warn } from "cc";
 import { PREVIEW } from "cc/env";
 import { ArgumentsTypeError } from "./error";
 
@@ -16,6 +16,208 @@ export const PropertyGet = (function () {
     };
 })();
 
+/**
+ * 
+ * @returns 
+ */
+export const makeDeferred = <T>() => {
+    let resolve: (value?: T) => void = null!;
+    let reject: (reason?: any) => void = null!;
+    let promise = new Promise<IGameFramework.Nullable<T>>((_resolve, _reject) => {
+        resolve = _resolve;
+        reject = _reject;
+    });
+
+    return {
+        resolve,
+        reject,
+        promise,
+    }
+}
+
+export const utils = {
+    get isPc(): boolean {
+        return sys.platform === sys.Platform.WIN32 ||
+            sys.platform === sys.Platform.MACOS ||
+            sys.platform === sys.Platform.DESKTOP_BROWSER ||
+            sys.os === sys.OS.WINDOWS ||
+            sys.os === sys.OS.LINUX ||
+            sys.os === sys.OS.OSX;
+    },
+
+    // 计算到根节点的距离
+    getDistanceToRoot(node: Node) {
+        let distance = 0;
+        let current = node;
+        while (current.parent) {
+            distance++;
+            current = current.parent;
+        }
+        return distance;
+    },
+
+    getCameraComponent<T extends Component>(comp: IGameFramework.Constructor<T>) {
+        const cameras = director.root!.cameraList;
+        for (let ia = 0; ia < cameras.length; ++ia) {
+            const camera = cameras[ia];
+            const com = camera.node.getComponent(comp);
+            if (com) {
+                return com;
+            }
+        }
+    },
+
+    getMainCamera(name: string = "Main Camera") {
+        const cameras = director.root!.cameraList;
+        for (let ia = 0; ia < cameras.length; ++ia) {
+            const camera = cameras[ia];
+            if (camera.node.name === name) {
+                return camera;
+            }
+        }
+    },
+}
+
+export class Deferred<T = any> {
+    public static PENDING = "PENDING";
+    public static FULFILLED = "FULFILLED";
+    public static REJECTED = "REJECTED";
+
+    public promise: Promise<T>;
+
+    private _resolve: (t: T) => void = null!;
+    private _reject: Function = null!;
+
+    public state: string = Deferred.PENDING;
+
+    constructor() {
+        this.promise = new Promise<T>((resolve, reject) => {
+            this._resolve = resolve;
+            this._reject = reject;
+        });
+    }
+
+    public fulfilled(value: T) {
+        if (this.state !== Deferred.PENDING) return;
+        this.state = Deferred.FULFILLED;
+        this._resolve(value);
+    }
+
+    public rejected(reason: any) {
+        if (this.state !== Deferred.PENDING) return;
+        this.state = Deferred.REJECTED;
+        this._reject(reason);
+    }
+
+    public then(func: (value: T) => any) {
+        return this.promise.then(func);
+    }
+
+    public catch(func: (value: any) => any) {
+        return this.promise.catch(func);
+    }
+}
+
+const getHttp = function <T>(ok: (response: IGameFramework.Nullable<T>) => void) {
+    let xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && (xhr.status >= 200 && xhr.status < 400)) {
+            const response = xhr.response;
+            ok(response as T);
+        }
+    };
+
+    // 超时
+    xhr.ontimeout = function (ev: ProgressEvent) {
+        ok(null);
+    };
+
+    // 异常
+    xhr.onerror = function (ev: ProgressEvent) {
+        ok(null);
+    };
+
+    // 取消
+    xhr.onabort = function (ev: ProgressEvent) {
+        ok(null);
+    };
+
+    return xhr;
+}
+
+/**
+ * Http请求
+ *
+ * @export
+ * @class HttpReq
+ */
+export class HttpReq {
+    private _domain: string;
+    private _timeout: number;
+
+    public constructor(domain: string, timeout: number) {
+        this._domain = domain;
+        this._timeout = timeout;
+    }
+
+    public async requestBinary<T>(handle: string, buffer: Uint8Array): Promise<IGameFramework.Nullable<T>> {
+        let r: (value: IGameFramework.Nullable<T>) => void;
+        const p = new Promise<IGameFramework.Nullable<T>>(resolve => { r = resolve });
+        const request = getHttp((result) => {
+            r(result as T);
+        });
+
+        this.setUrlAndTimeout(handle, request);
+        request.responseType = "arraybuffer";
+        request.setRequestHeader("Content-Type", "application/octet-stream");
+
+        request.send(buffer.buffer);
+        return await p;
+    }
+
+    public async requestJson<T>(handle: string, json: unknown): Promise<IGameFramework.Nullable<T>> {
+        let r: (value: IGameFramework.Nullable<T>) => void;
+        const p = new Promise<IGameFramework.Nullable<T>>(resolve => { r = resolve });
+        const request = getHttp((result) => {
+            r(result as T);
+        });
+        this.setUrlAndTimeout(handle, request);
+        request.responseType = "json";
+        request.setRequestHeader("Content-Type", "application/json");
+        request.send(JSON.stringify(json));
+        return await p;
+    }
+
+    public async requestText(handle: string, text: string): Promise<IGameFramework.Nullable<string>> {
+        let r: (value: IGameFramework.Nullable<string>) => void;
+        const p = new Promise<IGameFramework.Nullable<string>>(resolve => { r = resolve });
+        const request = getHttp((result) => {
+            r(result as string);
+        });
+        this.setUrlAndTimeout(handle, request);
+        request.responseType = "text";
+        request.setRequestHeader("Content-Type", 'text/plain');
+        request.send(text);
+        return await p;
+    }
+
+    private setUrlAndTimeout(handle: string, request: XMLHttpRequest): void {
+        request.open("POST", this._domain + handle, true);
+        request.timeout = this._timeout;
+    }
+}
+
+export const S2C_MESSAGE = "$s2cmsg";
+export const C2S_MESSAGE = "$c2smsg";
+
+/**
+ * 等待一定的时间
+ * @param time 毫秒
+ * @returns 
+ */
+export const setTimeoutAsync = (time: number) => {
+    return new Promise((resolve) => { setTimeout(resolve, time); });
+}
 
 /**
  * 随机颜色
@@ -481,6 +683,10 @@ export class RandomGenerator {
 
     public get seed(): number {
         return this._seed;
+    }
+
+    public set seed(value: number) {
+        this._seed = value;
     }
 
     public nextInt(max: number = 1, min: number = 0): number {

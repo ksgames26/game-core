@@ -1,4 +1,4 @@
-import { log, warn } from "cc";
+import { error, log, warn } from "cc";
 import { EDITOR } from "cc/env";
 
 interface Error {
@@ -67,7 +67,7 @@ function consoleTable<T extends object>(data: T[], properties?: (keyof T)[], col
 
                     logs.push(key.toString().padEnd(20));
                 }
-            } else { 
+            } else {
                 for (const o of colors.entries()) {
                     if (o[0].includes(row.toString())) {
                         logs.push(`color: ${o[1]};`);
@@ -235,6 +235,7 @@ export const logger = {
      */
     log: log,
     warn: warn,
+    error: error,
     table: consoleTable,
 
     /**
@@ -256,8 +257,10 @@ export const logger = {
         if (level == LoggerLevel.NONE) {
             this.log = function () { };
             this.warn = function () { };
+            this.error = function () { };
             this.table = function () { };
         } else {
+            this.error = type == LoggerType.CONSOLE ? console.error : PrivateLogger.log;
             this.warn = type == LoggerType.CONSOLE ? console.warn : PrivateLogger.log;
             this.log = type == LoggerType.CONSOLE ? console.log : PrivateLogger.log;
         }
@@ -278,9 +281,11 @@ export const logger = {
         if (type == LoggerType.CONSOLE && level != LoggerLevel.NONE) {
             this.log = console.log;
             this.warn = console.warn;
+            this.error = console.error;
         } else {
             this.log = PrivateLogger.log;
             this.warn = PrivateLogger.log;
+            this.error = PrivateLogger.log;
         }
     }
 }

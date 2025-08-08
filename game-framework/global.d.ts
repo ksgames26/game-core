@@ -580,6 +580,12 @@ declare global {
                 priority: number,
             ): Promise<TEventOverview[TEventName]>;
 
+            addAsyncListener<TEventName extends Extract<keyof TEventOverview, string>>(
+                eventName: TEventName,
+                callee: unknown,
+                priority: number,
+            ): Promise<TEventOverview[TEventName]>;
+
             removeListener<TEventName extends Extract<keyof TEventOverview, string>>(
                 eventName: TEventName,
                 listener: IGameFramework.EventListener<TEventOverview[TEventName]>,

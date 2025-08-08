@@ -1,5 +1,6 @@
 import { assert, js } from "cc";
-import { DEBUG } from "cc/env";
+import { DEBUG, EDITOR, EDITOR_NOT_IN_PREVIEW } from "cc/env";
+import { SortedSet } from "../structures/sorted-set";
 import { logger } from "./log";
 import { getClassInterface, interfaceOf } from "./misc";
 
@@ -10,6 +11,8 @@ import { getClassInterface, interfaceOf } from "./misc";
  * @class Container
  */
 export class Container {
+
+    private static _injectables: Set<IGameFramework.Constructor<unknown>> = new Set();
 
     /**
      * 单例类型
@@ -23,7 +26,11 @@ export class Container {
      * @type {Array<IGameFramework.ISingleton>}
      * @memberof Container
      */
-    private static _singletons: Array<IGameFramework.ISingleton> = [];
+    private static _singletons: SortedSet<IGameFramework.ISingleton> = new SortedSet<IGameFramework.ISingleton>((a, b) => {
+        let aOrder = a.updateOrder ?? 0;
+        let bOrder = b.updateOrder ?? 0;
+        return aOrder - bOrder;
+    });
 
     /**
      * 有且仅有一个实例的类，但是没有实现ISingleton接口
@@ -57,7 +64,7 @@ export class Container {
      */
     public static update() {
         for (let singleton of Container._singletons) {
-            singleton.onUpdate();
+            singleton.enableUpdate && singleton.onUpdate();
         }
     }
 
@@ -133,7 +140,7 @@ export class Container {
 
         const instance = new ctor();
         instance.onStart(args);
-        Container._singletons.push(instance);
+        Container._singletons.add(instance);
 
         DEBUG && logger.log("注入实例: " + js.getClassName(instance));
 
@@ -161,6 +168,46 @@ export class Container {
         DEBUG && logger.log("注入实例: " + js.getClassName(instance));
 
         return instance;
+    }
+
+    /**
+     * 自动注册实例
+     *
+     * @static
+     * @template TargetPath
+     * @memberof Container
+     */
+    public static injectable<T extends Object>(): (target: IGameFramework.Constructor<T>) => IGameFramework.Constructor<T> {
+        const invoke = (target: IGameFramework.Constructor<T>) => {
+            Container._injectables.add(target);
+            return target;
+        };
+
+        if (EDITOR) {
+            if (!EDITOR_NOT_IN_PREVIEW) {
+                return invoke;
+            }
+
+            return (target: IGameFramework.Constructor<T>) => {
+                return target;
+            };
+        }
+
+        return invoke;
+    }
+
+    /**
+     * 注册所有injectables
+     *
+     * @static
+     * @memberof Container
+     */
+    public static registerInjectables() {
+        for (let ctor of Container._injectables) {
+            Container.addInstance(ctor as IGameFramework.Constructor<Object>);
+        }
+
+        Container._injectables.clear();
     }
 
     /**
@@ -210,3 +257,4 @@ export class Container {
         return null;
     }
 }
+
