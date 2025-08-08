@@ -78,7 +78,7 @@ export class Container {
      * @return {*}  {IGameFramework.Nullable<T>}
      * @memberof Container
      */
-    public static get<T extends Object>(t: IGameFramework.Constructor<T>): IGameFramework.Nullable<T> {
+    public static get<T>(t: IGameFramework.Constructor<T>): IGameFramework.Nullable<T> {
         return Container._cast(t);
     }
 
@@ -157,7 +157,7 @@ export class Container {
      * @return {*}  {T}
      * @memberof Container
      */
-    public static addInstance<T extends Object>(t: IGameFramework.Constructor<T>): T {
+    public static addInstance<T>(t: IGameFramework.Constructor<T>): T {
         let instance = Container._cast(t);
         if (instance) {
             return instance;
@@ -178,7 +178,7 @@ export class Container {
      * @template TargetPath
      * @memberof Container
      */
-    public static injectable<T extends Object>(): (target: IGameFramework.Constructor<T>) => IGameFramework.Constructor<T> {
+    public static injectable<T>(): (target: IGameFramework.Constructor<T>) => IGameFramework.Constructor<T> {
         const invoke = (target: IGameFramework.Constructor<T>) => {
             Container._injectables.add(target);
             return target;
