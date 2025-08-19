@@ -278,39 +278,47 @@ export function getLogger(tag: string): ILogger {
 
     return {
         tag,
-        debug(...info: any[]) {
+        get debug() {
             if (config.debug) {
                 if (type === LoggerType.HTTP) {
-                    addLogToBuffer('DEBUG', tag, info);
+                    return function (...info: any[]): void { 
+                        addLogToBuffer('DEBUG', tag, info);
+                    }
                 } else {
-                    printLog()(tag, ...info);
+                    return printLog();
                 }
             }
         },
-        info(...info: any[]) {
+        get info() {
             if (config.info) {
                 if (type === LoggerType.HTTP) {
-                    addLogToBuffer('INFO', tag, info);
+                    return function (...info: any[]): void { 
+                        addLogToBuffer('INFO', tag, info);
+                    }
                 } else {
-                    printLog()(tag, ...info);
+                    return printLog();
                 }
             }
         },
-        warn(...info: any[]) {
+        get warn() {
             if (config.warn) {
                 if (type === LoggerType.HTTP) {
-                    addLogToBuffer('WARN', tag, info);
+                    return function (...info: any[]): void {
+                        addLogToBuffer('WARN', tag, info);
+                    }
                 } else {
-                    printWarn()(tag, ...info);
+                    return printWarn();
                 }
             }
         },
-        error(...info: any[]) {
+        get error() {
             if (config.error) {
                 if (type === LoggerType.HTTP) {
-                    addLogToBuffer('ERROR', tag, info);
+                    return function (...info: any[]): void {
+                        addLogToBuffer('ERROR', tag, info);
+                    }
                 } else {
-                    printError()(tag, ...info);
+                    return printError();
                 }
             }
         }
@@ -362,7 +370,7 @@ export const logger = {
                 };
 
                 // 更新现有配置
-                if (!config.enable) { 
+                if (!config.enable) {
                     existing.debug = false;
                     existing.info = false;
                     existing.warn = false;
@@ -493,7 +501,7 @@ export const logger = {
      */
     set type(value: LoggerType) {
         type = value;
-        
+
         // 如果切换到非HTTP模式，先刷新缓冲区
         if (value !== LoggerType.HTTP && logBuffer.length > 0) {
             flushLogBuffer();
