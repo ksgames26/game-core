@@ -1,4 +1,5 @@
 import { error, log, warn } from "cc";
+import { fnEmpty } from "./misc";
 
 // 日志配置存储 
 const loggers = new Map<string, {
@@ -184,12 +185,12 @@ function consoleTable<T extends object>(data: T[], properties?: (keyof T)[], col
 /**
  * 统一的日志打印函数
  */
-function printLog(): (...info: any[]) => void {
+function printLog(tag?: string): (...info: any[]) => void {
     if (!_globalEnabled) return function () { };
 
     switch (type) {
         case LoggerType.CONSOLE:
-            return console.log.bind(console, '%c[日志]', 'color: white; background-color: #28a745; ');
+            return console.log.bind(console, '%c[日志]', 'color: white; background-color: #28a745; ', `[${tag ?? "logger"}]`);
         case LoggerType.HTTP:
             return (...info: any[]) => {
                 addLogToBuffer('LOG', 'GLOBAL', info);
@@ -203,12 +204,12 @@ function printLog(): (...info: any[]) => void {
 /**
  * 统一的警告打印函数
  */
-function printWarn(): (...info: any[]) => void {
+function printWarn(tag?: string): (...info: any[]) => void {
     if (!_globalEnabled) return function () { };
 
     switch (type) {
         case LoggerType.CONSOLE:
-            return console.warn.bind(console, '%c[警告]', 'color: white; background-color: #ffc107; ');
+            return console.warn.bind(console, '%c[警告]', 'color: white; background-color: #ffc107; ', `[${tag ?? "logger"}]`);
         case LoggerType.HTTP:
             return (...info: any[]) => {
                 addLogToBuffer('WARN', 'GLOBAL', info);
@@ -222,12 +223,12 @@ function printWarn(): (...info: any[]) => void {
 /**
  * 统一的错误打印函数
  */
-function printError(): (...info: any[]) => void {
+function printError(tag?: string): (...info: any[]) => void {
     if (!_globalEnabled) return function () { };
 
     switch (type) {
         case LoggerType.CONSOLE:
-            return console.error.bind(console, '%c[错误]', 'color: white; background-color: #dc3545; ');
+            return console.error.bind(console, '%c[错误]', 'color: white; background-color: #dc3545; ', `[${tag ?? "logger"}]`);
         case LoggerType.HTTP:
             return (...info: any[]) => {
                 addLogToBuffer('ERROR', 'GLOBAL', info);
@@ -281,23 +282,27 @@ export function getLogger(tag: string): ILogger {
         get debug() {
             if (config.debug) {
                 if (type === LoggerType.HTTP) {
-                    return function (...info: any[]): void { 
+                    return function (...info: any[]): void {
                         addLogToBuffer('DEBUG', tag, info);
                     }
                 } else {
-                    return printLog();
+                    return printLog(tag);
                 }
+            } else {
+                return fnEmpty;
             }
         },
         get info() {
             if (config.info) {
                 if (type === LoggerType.HTTP) {
-                    return function (...info: any[]): void { 
+                    return function (...info: any[]): void {
                         addLogToBuffer('INFO', tag, info);
                     }
                 } else {
-                    return printLog();
+                    return printLog(tag);
                 }
+            } else {
+                return fnEmpty;
             }
         },
         get warn() {
@@ -307,8 +312,10 @@ export function getLogger(tag: string): ILogger {
                         addLogToBuffer('WARN', tag, info);
                     }
                 } else {
-                    return printWarn();
+                    return printWarn(tag);
                 }
+            } else {
+                return fnEmpty;
             }
         },
         get error() {
@@ -318,8 +325,10 @@ export function getLogger(tag: string): ILogger {
                         addLogToBuffer('ERROR', tag, info);
                     }
                 } else {
-                    return printError();
+                    return printError(tag);
                 }
+            } else {
+                return fnEmpty;
             }
         }
     };
