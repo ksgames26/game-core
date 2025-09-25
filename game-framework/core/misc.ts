@@ -1,6 +1,7 @@
-import { assetManager, CCClass, view as ccview, Color, Component, director, error, EventTouch, game, isValid, js, Node, Rect, screen, sys, warn } from "cc";
+import { assetManager, CCClass, view as ccview, Color, Component, director, error, EventTouch, game, isValid, js, Node, Rect, screen, sys } from "cc";
 import { EDITOR, EDITOR_NOT_IN_PREVIEW, PREVIEW } from "cc/env";
 import { ArgumentsTypeError } from "./error";
+import { logger } from "./log";
 
 export const supportReflect = typeof Reflect !== "undefined";
 
@@ -180,7 +181,7 @@ export class HttpReq {
         request.responseType = "arraybuffer";
         request.setRequestHeader("Content-Type", "application/octet-stream");
 
-        request.send(buffer.buffer);
+        request.send(buffer.buffer as ArrayBuffer);
         return await p;
     }
 
@@ -367,6 +368,17 @@ export function isEmptyStr(str: IGameFramework.Nullable<string>): boolean {
     return str === "" || isNullOrUndefined(str);
 }
 
+/**
+ * 判断一个对象是否是Promise
+ *
+ * @export
+ * @template U
+ * @param {*} p
+ * @return {*}  {p is Promise<U>}
+ */
+export function isPromise<U>(p: any): p is Promise<U> {
+  return p && Object.prototype.toString.call(p) === "[object Promise]";
+}
 
 /**
  * 获取URL中的参数
@@ -382,6 +394,35 @@ export function getUrlParam(urlStr: string, urlKey: string): string {
     const reg = new RegExp('(^|&)' + urlKey + '=([^&]*)(&|$)', 'i');
     const r = search.match(reg);
     return r ? decodeURIComponent(r[2]) : "";
+}
+
+/**
+ * 尝试多次异步调用，直到成功或达到最大重试次数
+ *
+ * @export
+ * @template T
+ * @param {() => Promise<T>} asyncFn 异步函数
+ * @param {number} retries 最大重试次数
+ * @param {number} delay 每次重试之间的延迟（毫秒）
+ * @return {*}  {Promise<T>}
+ */
+export async function retryAsync<T>(asyncFn: () => Promise<T>, retries: number = 3, delay: number = 1000): Promise<T> {
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            return await asyncFn();
+        } catch (error) {
+            attempt++;
+            if (attempt >= retries) {
+                throw error;
+            }
+
+            if (delay != 0) {
+                await setTimeoutAsync(delay);
+            }
+        }
+    }
+    throw new Error("Retry attempts exceeded");
 }
 
 /**
@@ -762,6 +803,16 @@ export function touchEnable(node: Node) {
  *
  * @export
  */
-export function TODOTEST() {
-    warn("TODO: 等待测试");
+export function TODOTEST(args: string) {
+    logger.error("TODO: 等待测试", args);
+}
+
+/**
+ * 待完成函数
+ *
+ * @export
+ * @param {string} args
+ */
+export function TODO(args: string) {
+    logger.warn("TODO: 待完成", args);
 }

@@ -1,5 +1,5 @@
 import "cc";
-import { physics } from "cc";
+import { Component, physics } from "cc";
 
 export { };
 
@@ -85,6 +85,30 @@ declare global {
     }
 
     namespace IGameFramework {
+        type IGraphID = string;
+        type IListenerStepIndex = number;
+        type IListenerBranchID = string;
+        type IListenerBranchPrefabUUID = string;
+        type IListenerId = [IGraphID, IListenerStepIndex, IListenerBranchID, IListenerBranchPrefabUUID];
+        type IListenerIds = IListenerId[];
+        interface IGameEvent {
+            "beginners-tutorial": { uuid: string, view: Component },
+            "tutorial-step-lock": { path: string },
+            "tutorial-step-unlock": void,
+
+
+            /**
+             * 视图是否有新手引导
+             * 
+             * graphID  是图ID
+             * stepIndex 是步骤索引
+             * branchID 是引导分支ID
+             * uuid     是引导所在视图Prefab的UUID，由新手引导编辑器配置导出
+             *
+             * @event [graphID,stepIndex,branchID,uuid][]
+             */
+            "view-has-tutorial": IListenerIds,
+        }
 
         /**
          * 帧同步
@@ -865,6 +889,14 @@ declare global {
              * @memberof PropertypeDefine
              */
             binding?: boolean | string;
+
+            /**
+             * 组件ID
+             *
+             * @type {number}
+             * @memberof PropertypeDefine
+             */
+            compIndex: number;
         }
 
         /**
@@ -1251,20 +1283,21 @@ declare global {
             onUpdate(): void;
 
             /**
-             * 回收任务句柄
-             *
-             * @param {ITaskHandle<any>} handler
-             * @memberof ITaskRuntime
-             */
-            free(handler: ITaskHandle<unknown>): void;
-
-            /**
              * 获取一个空的任务句柄
              *
              * @return {*}  {ITaskHandle<unknown>}
              * @memberof ITaskRuntime
              */
             get(): ITaskHandle<unknown>;
+
+            /**
+             * 回收任务句柄
+             *
+             * @template T
+             * @param {IGameFramework.ITaskHandle<T>} handle
+             * @memberof ITaskRuntime
+             */
+            freeTask<T>(handle: ITaskHandle<T>): void;
 
             /**
              * 运行任务
@@ -1283,7 +1316,7 @@ declare global {
              * @return {*}  {ITaskHandle<T>}
              * @memberof ITaskRuntime
              */
-            waitNextFrame<T>(): ITaskHandle<T>;
+            waitNextFrame<T>(token?: ICancellationToken): ITaskHandle<T>;
 
             /**
              * 等待指定帧数后执行
@@ -1295,6 +1328,17 @@ declare global {
              * @memberof ITaskRuntime
              */
             waitDelayFrame<T>(frame: number, token?: ICancellationToken): ITaskHandle<T>;
+
+
+            /**
+             * 等待指定时间后执行
+             *
+             * @param {number} delay
+             * @param {IGameFramework.ICancellationToken} [token]
+             * @return {*}  {IGameFramework.ITaskHandle<number>}
+             * @memberof ITaskRuntime
+             */
+            waitDelay(delay: number, token?: IGameFramework.ICancellationToken): IGameFramework.ITaskHandle<number>;
 
             /**
              * 等待条件满足
@@ -1317,6 +1361,29 @@ declare global {
              * @memberof ITaskRuntime
              */
             loopFrameAsyncIter(frame: number, token?: ICancellationToken): ITaskHandle<number>;
+
+            /**
+             * 每帧更新
+             *
+             * @param {() => void} callback
+             * @param {unknown} callee
+             * @param {IGameFramework.ICancellationToken} [token]
+             * @return {*}  {IGameFramework.ITaskHandle<void>}
+             * @memberof ITaskRuntime
+             */
+            frameLoopTask(callback: () => void, callee: unknown, token?: IGameFramework.ICancellationToken): IGameFramework.ITaskHandle<void>;
+
+            /**
+             * 时间更新
+             *
+             * @param {(time: number) => void} callback
+             * @param {unknown} callee
+             * @param {number} interval
+             * @param {IGameFramework.ICancellationToken} [token]
+             * @return {*}  {IGameFramework.ITaskHandle<void>}
+             * @memberof ITaskRuntime
+             */
+            timeLoopTask(callback: (time: number) => void, callee: unknown, interval: number, token?: IGameFramework.ICancellationToken): IGameFramework.ITaskHandle<void>;
         }
 
         /**
@@ -1428,6 +1495,14 @@ declare global {
              * @memberof IStateMachineBlackboard
              */
             getValue<T>(key: string): Nullable<T>;
+
+
+            /**
+             * 清理黑板数据
+             *
+             * @memberof IStateMachineBlackboard
+             */
+            clear(): void;
         }
 
         /**
@@ -1542,6 +1617,20 @@ declare global {
              * @memberof IStateMachine
              */
             afterStateChange(prev: IGameFramework.Nullable<S>, curr: IGameFramework.Nullable<S>): void;
+
+            /**
+             * 是不是当前状态
+             */
+            currentIsState(state: IGameFramework.Constructor<S> | string): boolean;
+
+            /**
+             * 检查当前状态是否为提供的多个状态之一
+             *
+             * @param {...(IGameFramework.Constructor<S> | string)[]} states
+             * @return {*}  {boolean}
+             * @memberof StateMachine
+             */
+            currentIsAnyOf(...states: (IGameFramework.Constructor<S> | string)[]): boolean;
 
             /**
              * 获取当前状态机的持有者

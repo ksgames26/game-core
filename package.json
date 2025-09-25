@@ -1,27 +1,28 @@
 {
-    "$schema": "./@types/schema/package/index.json",
-    "package_version": 2,
-    "name": "game-core",
-    "version": "1.0.0",
-    "author": "v",
-    "editor": ">=3.8.3",
-    "scripts": {
-        "build": "tsc",
-        "watch": "tsc -w"
-    },
-    "description": "i18n:game-core.description",
-    "main": "./dist/main.js",
-    "devDependencies": {
-        "@cocos/creator-types": "^3.8.3",
-        "@types/node": "^18.17.1",
-        "typescript": "^4.3.4"
-    },
-    "contributions": {
-        "asset-db": {
-            "mount": {
-                "path": "./game-framework",
-                "readonly": true
-            }
-        }
+  "$schema": "./@types/schema/package/index.json",
+  "package_version": 2,
+  "name": "game-core",
+  "version": "1.0.0",
+  "author": "v",
+  "editor": ">=3.8.3",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "description": "i18n:game-core.description",
+  "main": "./dist/main.js",
+  "devDependencies": {
+    "@cocos/creator-types": "^3.8.3",
+    "@types/node": "^18.17.1",
+    "typescript": "^4.3.4"
+  },
+  "contributions": {
+    "asset-db": {
+      "mount": {
+        "path": "./game-framework",
+        "readonly": true
+      }
     }
+  },
+  "last_commit": "2025-08-08T06:33:51Z"
 }
