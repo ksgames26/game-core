@@ -33,6 +33,11 @@ export class Container {
         return aOrder - bOrder;
     });
 
+    static {
+        // @ts-ignore
+        globalThis.__GF_Container ??= Container;
+    }
+
     /**
      * 有且仅有一个实例的类，但是没有实现ISingleton接口
      * 

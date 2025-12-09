@@ -1,5 +1,11 @@
-import { error, log, warn } from "cc";
-import { fnEmpty } from "./misc";
+import { error, log, sys, warn } from "cc";
+
+/**
+ * 空函数
+ * 
+ * @exports
+ */
+const fnEmpty = () => { };
 
 // 日志配置存储 
 const loggers = new Map<string, {
@@ -7,6 +13,7 @@ const loggers = new Map<string, {
     info: boolean;
     warn: boolean;
     error: boolean;
+    style: { infoColor: string; warnColor: string; errorColor: string };
 }>();
 
 /**
@@ -144,40 +151,61 @@ function consoleTable<T extends object>(data: T[], properties?: (keyof T)[], col
     const keys = properties ? properties : (Object.keys(data[0]) as (keyof T)[]);
 
     // 打印表头
-    // console.log(keys.map(key => (<string>key).padEnd(20)).join('|'));
-    // console.log(keys.map(() => '---'.padEnd(20, '-')).join('|'));
+    console.log(keys.map(key => (<string>key).padEnd(20)).join('|'));
+    console.log(keys.map(() => '---'.padEnd(20, '-')).join('|'));
 
     if (colors) {
-        let styles = Array.from({ length: keys.length }).map(e => "%c%s").join(" ");
         data.forEach(row => {
-            let logs = [styles];
-            if (Array.isArray(row)) {
-                for (let k = 0; k < row.length; ++k) {
-                    let key = row[k];
-                    for (const o of colors.entries()) {
-                        if (key.toString().includes(o[0])) {
-                            logs.push(`color: ${o[1]};background:rgba(211,211,211,255);font-weight:bold`);
-                            break;
-                        }
-                    }
+            const formatParts: string[] = [];
+            const args: any[] = [];
 
-                    logs.push(key.toString().padEnd(20));
-                }
-            } else {
-                for (const o of colors.entries()) {
-                    if (o[0].includes(row.toString())) {
-                        logs.push(`color: ${o[1]};`);
+            // 行里每一列
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                // 支持数组行或对象行
+                const cell = Array.isArray(row) ? (row as any)[i] : (row as any)[key];
+                const isObject = typeof cell === 'object' && cell !== null;
+                const cellStr = isObject ? JSON.stringify(cell) : String(cell);
+
+                // 计算样式
+                let style = '';
+                for (const [substr, col] of colors.entries()) {
+                    if (cellStr.includes(substr)) {
+                        style = `color: ${col};background:rgba(211,211,211,255);font-weight:bold`;
                         break;
                     }
                 }
 
-                logs.push(row.toString().padEnd(20));
+                if (isObject) {
+                    // 用 %o 展开对象，配合样式 %c
+                    formatParts.push("%c%o");
+                    args.push(style);
+                    args.push(cell);
+                } else {
+                    formatParts.push("%c%s");
+                    args.push(style);
+                    args.push(cellStr.padEnd(20));
+                }
             }
-            console.log.apply(console, logs);
+
+            const format = formatParts.join(" ");
+            console.log.apply(console, [format, ...args]);
         });
     } else {
         data.forEach(row => {
-            console.log(keys.map(key => String(row[key]).padEnd(20)).join('|'));
+            const cells = keys.map(key => {
+                const val = (row as any)[key];
+                if (typeof val === 'object' && val !== null) {
+                    // 展开对象，格式化为可读的 JSON
+                    try {
+                        return JSON.stringify(val, null, 2).replace(/\n/g, ' ');
+                    } catch {
+                        return String(val);
+                    }
+                }
+                return String(val).padEnd(20);
+            });
+            console.log(cells.join('|'));
         });
     }
 }
@@ -185,12 +213,16 @@ function consoleTable<T extends object>(data: T[], properties?: (keyof T)[], col
 /**
  * 统一的日志打印函数
  */
-function printLog(tag?: string): (...info: any[]) => void {
+function printLog(tag?: string, infoColor?: string): (...info: any[]) => void {
     if (!_globalEnabled) return function () { };
 
     switch (type) {
         case LoggerType.CONSOLE:
-            return console.log.bind(console, '%c[日志]', 'color: white; background-color: #28a745; ', `[${tag ?? "logger"}]`);
+            // 移动端不打印样式日志
+            if (sys.isMobile) {
+                return log;
+            }
+            return console.log.bind(console, `%c[${tag ?? "logger"}]`, `color: ${infoColor ?? '#28a745'}; text-decoration: underline;`);
         case LoggerType.HTTP:
             return (...info: any[]) => {
                 addLogToBuffer('LOG', 'GLOBAL', info);
@@ -204,12 +236,16 @@ function printLog(tag?: string): (...info: any[]) => void {
 /**
  * 统一的警告打印函数
  */
-function printWarn(tag?: string): (...info: any[]) => void {
+function printWarn(tag?: string, warnColor?: string): (...info: any[]) => void {
     if (!_globalEnabled) return function () { };
 
     switch (type) {
         case LoggerType.CONSOLE:
-            return console.warn.bind(console, '%c[警告]', 'color: white; background-color: #ffc107; ', `[${tag ?? "logger"}]`);
+            // 移动端不打印样式日志
+            if (sys.isMobile) {
+                return warn;
+            }
+            return console.warn.bind(console, `%c[${tag ?? "logger"}]`, `color: ${warnColor ?? '#ffc107'};  text-decoration: underline;`);
         case LoggerType.HTTP:
             return (...info: any[]) => {
                 addLogToBuffer('WARN', 'GLOBAL', info);
@@ -223,12 +259,16 @@ function printWarn(tag?: string): (...info: any[]) => void {
 /**
  * 统一的错误打印函数
  */
-function printError(tag?: string): (...info: any[]) => void {
+function printError(tag?: string, errorColor?: string): (...info: any[]) => void {
     if (!_globalEnabled) return function () { };
 
     switch (type) {
         case LoggerType.CONSOLE:
-            return console.error.bind(console, '%c[错误]', 'color: white; background-color: #dc3545; ', `[${tag ?? "logger"}]`);
+            // 移动端不打印样式日志
+            if (sys.isMobile) {
+                return error;
+            }
+            return console.error.bind(console, `%c[${tag ?? "logger"}]`, `color: ${errorColor ?? '#dc3545'}; text-decoration: underline;`);
         case LoggerType.HTTP:
             return (...info: any[]) => {
                 addLogToBuffer('ERROR', 'GLOBAL', info);
@@ -256,6 +296,7 @@ export interface ILogger {
     info(...info: any[]): void;
     warn(...info: any[]): void;
     error(...info: any[]): void;
+    consoleTable(...args: any[]): void;
 }
 
 /**
@@ -264,71 +305,110 @@ export interface ILogger {
  * @param tag 日志标签
  * @returns 日志实例
  */
-export function getLogger(tag: string): ILogger {
-    // 获取或创建配置
-    if (!loggers.has(tag)) {
-        loggers.set(tag, {
-            debug: level >= LoggerLevel.DEBUG,
-            info: level >= LoggerLevel.INFO,
-            warn: level >= LoggerLevel.WARN,
-            error: level >= LoggerLevel.ERROR
-        });
-    }
+export function getLogger(tag: string, options?: { style: { infoColor: string, warnColor: string, errorColor: string } }): ILogger {
 
-    const config = loggers.get(tag)!;
+    let registered = false;
+    let config = loggers.get(tag)!;
+
+    // 延迟注入
+    // 只有在首次访问具体日志方法时，才会注册该日志标签的配置
+    // 确保全局配置已经初始化
+    const lazyRegister = () => {
+        if (registered) return;
+
+        // 获取或创建配置
+        if (!loggers.has(tag)) {
+            loggers.set(tag, {
+                debug: level >= LoggerLevel.DEBUG,
+                info: level >= LoggerLevel.INFO,
+                warn: level >= LoggerLevel.WARN,
+                error: level >= LoggerLevel.ERROR,
+                style: options?.style ?? { infoColor: '#28a745', warnColor: '#ffc107', errorColor: '#dc3545' }
+            });
+        } else if (options?.style) {
+            const existing = loggers.get(tag)!;
+            existing.style = options.style;
+        }
+
+        config = loggers.get(tag)!;
+        registered = true;
+    };
 
     return {
         tag,
         get debug() {
+            lazyRegister();
+
             if (config.debug) {
                 if (type === LoggerType.HTTP) {
                     return function (...info: any[]): void {
                         addLogToBuffer('DEBUG', tag, info);
                     }
                 } else {
-                    return printLog(tag);
+                    return printLog(tag, config.style.infoColor);
                 }
             } else {
                 return fnEmpty;
             }
         },
         get info() {
+            lazyRegister();
+
             if (config.info) {
                 if (type === LoggerType.HTTP) {
                     return function (...info: any[]): void {
                         addLogToBuffer('INFO', tag, info);
                     }
                 } else {
-                    return printLog(tag);
+                    return printLog(tag, config.style.infoColor);
                 }
             } else {
                 return fnEmpty;
             }
         },
         get warn() {
+            lazyRegister();
+
             if (config.warn) {
                 if (type === LoggerType.HTTP) {
                     return function (...info: any[]): void {
                         addLogToBuffer('WARN', tag, info);
                     }
                 } else {
-                    return printWarn(tag);
+                    return printWarn(tag, config.style.warnColor);
                 }
             } else {
                 return fnEmpty;
             }
         },
         get error() {
+            lazyRegister();
+
             if (config.error) {
                 if (type === LoggerType.HTTP) {
                     return function (...info: any[]): void {
                         addLogToBuffer('ERROR', tag, info);
                     }
                 } else {
-                    return printError(tag);
+                    return printError(tag, config.style.errorColor);
                 }
             } else {
                 return fnEmpty;
+            }
+        },
+        get consoleTable() {
+            lazyRegister();
+            if (level < LoggerLevel.DEBUG) return function () { };
+            if (type === LoggerType.HTTP) {
+                return function (...args: any[]): void {
+                    addLogToBuffer('TABLE', tag, args);
+                }
+            } else {
+                if (sys.isMobile) {
+                    return printTable();
+                }
+
+                return consoleTable;
             }
         }
     };
@@ -339,6 +419,8 @@ export function getLogger(tag: string): ILogger {
  */
 export const logger = {
 
+    getDefaultColorStyle: () => ({ infoColor: '#28a745', warnColor: '#ffc107', errorColor: '#dc3545' }),
+
     initialize: (configs?: {
         global?: { enabled?: boolean },
         http?: HttpLogConfig,
@@ -348,6 +430,7 @@ export const logger = {
             warn?: boolean;
             error?: boolean;
             enable?: boolean;
+            style?: { infoColor: string; warnColor: string; errorColor: string };
         }>,
     }) => {
         if (!configs) return;
@@ -375,7 +458,8 @@ export const logger = {
                     debug: level >= LoggerLevel.DEBUG,
                     info: level >= LoggerLevel.INFO,
                     warn: level >= LoggerLevel.WARN,
-                    error: level >= LoggerLevel.ERROR
+                    error: level >= LoggerLevel.ERROR,
+                    style: { infoColor: '#28a745', warnColor: '#ffc107', errorColor: '#dc3545' }
                 };
 
                 // 更新现有配置
@@ -390,7 +474,8 @@ export const logger = {
                     debug: config.debug ?? existing.debug,
                     info: config.info ?? existing.info,
                     warn: config.warn ?? existing.warn,
-                    error: config.error ?? existing.error
+                    error: config.error ?? existing.error,
+                    style: config.style || existing.style || { infoColor: '#28a745', warnColor: '#ffc107', errorColor: '#dc3545' }
                 });
             });
         }
@@ -403,7 +488,7 @@ export const logger = {
      * @param enabled 是否启用
      */
     setLoggerEnabled: (tag: string, levelType: 'debug' | 'info' | 'warn' | 'error', enabled: boolean) => {
-        const existing = loggers.get(tag) || { debug: true, info: true, warn: true, error: true };
+        const existing = loggers.get(tag) || { debug: true, info: true, warn: true, error: true, style: { infoColor: '#28a745', warnColor: '#ffc107', errorColor: '#dc3545' } };
         existing[levelType] = enabled;
         loggers.set(tag, existing);
     },
@@ -418,7 +503,8 @@ export const logger = {
             debug: enabled,
             info: enabled,
             warn: enabled,
-            error: enabled
+            error: enabled,
+            style: { infoColor: '#28a745', warnColor: '#ffc107', errorColor: '#dc3545' }
         });
     },
 
@@ -458,6 +544,11 @@ export const logger = {
         return printLog();
     },
 
+    get debug(): (...info: any[]) => void {
+        if (level < LoggerLevel.DEBUG) return function () { };
+        return printLog();
+    },
+
     get warn(): (...info: any[]) => void {
         if (level < LoggerLevel.WARN) return function () { };
         return printWarn();
@@ -469,7 +560,16 @@ export const logger = {
     },
 
     get table(): (...args: any[]) => void {
+        if (level < LoggerLevel.DEBUG) return function () { };
         return printTable();
+    },
+
+    get consoleTable() {
+        if (level < LoggerLevel.DEBUG) return function () { };
+        if (sys.isMobile) {
+            return printTable();
+        }
+        return consoleTable;
     },
 
     /**

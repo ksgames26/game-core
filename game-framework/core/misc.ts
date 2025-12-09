@@ -1,7 +1,8 @@
 import { assetManager, CCClass, view as ccview, Color, Component, director, error, EventTouch, game, isValid, js, Node, Rect, screen, sys } from "cc";
-import { EDITOR, EDITOR_NOT_IN_PREVIEW, PREVIEW } from "cc/env";
+import { EDITOR, EDITOR_NOT_IN_PREVIEW, JSB, PREVIEW } from "cc/env";
 import { ArgumentsTypeError } from "./error";
 import { logger } from "./log";
+import { native } from "cc";
 
 export const supportReflect = typeof Reflect !== "undefined";
 
@@ -266,6 +267,41 @@ export const secFrame = (t: number) => {
 };
 
 /**
+ * 判断两个数组是否相等
+ * 
+ * 函数默认不会判断顺序，所以你需要自己排序
+ *
+ * @export
+ * @template T
+ * @param {(ReadonlyArray<T> | null)} [a]
+ * @param {(ReadonlyArray<T> | null)} [b]
+ * @param {(x: T, y: T) => boolean} [comparator]
+ * @return {*}  {boolean}
+ */
+export function arraysEqual<T>(a?: ReadonlyArray<T> | null, b?: ReadonlyArray<T> | null, comparator?: (x: T, y: T) => boolean): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+
+    if (comparator) {
+        for (let i = 0; i < a.length; i++) {
+            if (!comparator(a[i], b[i])) return false;
+        }
+        return true;
+    }
+
+    for (let i = 0; i < a.length; i++) {
+        const va = a[i] as any;
+        const vb = b[i] as any;
+        if (va === vb) continue;
+        // 处理 NaN（NaN !== NaN）
+        if (va !== va && vb !== vb) continue;
+        return false;
+    }
+    return true;
+}
+
+/**
  * 当前类型实现一个接口
  *
  * @export
@@ -298,6 +334,109 @@ export function interfaceOf<T>(target: T, iface: string): boolean {
     }
 
     return false;
+}
+
+/**
+ * 复制到剪贴板（支持 text/plain 与 text/html）
+ *
+ * 用法:
+ * await copyToClipboard("<b>hello</b>", true); // 复制HTML
+ * await copyToClipboard("plain text"); // 复制纯文本
+ */
+export async function copyToClipboard(content: string, isHtml: boolean = false): Promise<boolean> {
+
+    if (sys.isNative || JSB) { 
+        native.copyTextToClipboard(content);
+        return true;
+    }
+
+    // 优先使用异步 Clipboard API，支持写入 html 的浏览器会提供 navigator.clipboard.write
+    try {
+        const nc = navigator.clipboard;
+        if (nc && typeof nc.write === "function") {
+            if (isHtml) {
+                const blobHtml = new Blob([content], { type: "text/html" });
+                const blobText = new Blob([stripHtmlToText(content)], { type: "text/plain" });
+                const item = new ClipboardItem({
+                    "text/html": blobHtml,
+                    "text/plain": blobText,
+                });
+                await nc.write([item]);
+            } else {
+                await nc.writeText(content);
+            }
+            return true;
+        }
+    } catch (e) {
+        // 继续使用 fallback
+        logger.warn("Clipboard API 写入剪贴板失败，使用 fallback 方式", e);
+    }
+
+    // fallback: 使用 document.execCommand('copy')
+    try {
+        if (isHtml) {
+            // 使用 contentEditable 的临时元素来保留 HTML 格式
+            const container = document.createElement("div");
+            container.contentEditable = "true";
+            container.style.position = "fixed";
+            container.style.left = "-9999px";
+            container.innerHTML = content;
+            document.body.appendChild(container);
+
+            const selection = window.getSelection();
+            if (!selection) {
+                document.body.removeChild(container);
+                return false;
+            }
+            const range = document.createRange();
+            range.selectNodeContents(container);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            const ok = document.execCommand("copy");
+            selection.removeAllRanges();
+            document.body.removeChild(container);
+            return ok;
+        } else {
+            // 纯文本：使用 textarea
+            const textarea = document.createElement("textarea");
+            textarea.value = content;
+            // 防止页面滚动
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            // iOS 需要 setSelectionRange
+            textarea.setSelectionRange(0, textarea.value.length);
+            const ok = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            return ok;
+        }
+    } catch (e) {
+        logger.error("复制到剪贴板失败", e);
+
+        return false;
+    }
+}
+
+/**
+ * 复制 HTML 到剪贴板
+ */
+export async function copyHtmlToClipboard(html: string): Promise<boolean> {
+    return copyToClipboard(html, true);
+}
+
+/**
+ * 复制纯文本到剪贴板
+ */
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+    return copyToClipboard(text, false);
+}
+
+function stripHtmlToText(html: string): string {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return div.textContent ?? div.innerText ?? "";
 }
 
 /**
@@ -340,6 +479,7 @@ export function getClassInterface<T>(target: IGameFramework.Constructor<T>): str
  * @return {*}  {boolean}
  */
 export function isDestroyed(node: Node): boolean {
+    if(!node) return true;
 
     // 常规情况下，parent也可以为null吗？在当前设计范围内，parent为null的节点。我们统一认为是不合理的
     return !isValid(node, true) || node.parent == null;
@@ -369,6 +509,17 @@ export function isEmptyStr(str: IGameFramework.Nullable<string>): boolean {
 }
 
 /**
+ * 是不是空对象
+ *
+ * @export
+ * @param {IGameFramework.Nullable<unknown>} obj
+ * @return {*}  {boolean}
+ */
+export function isEmptyObject(obj: IGameFramework.Nullable<unknown>): boolean {
+    return obj === null || obj === void 0 || (typeof obj === "object" && Object.keys(obj).length === 0);
+}
+
+/**
  * 判断一个对象是否是Promise
  *
  * @export
@@ -377,7 +528,7 @@ export function isEmptyStr(str: IGameFramework.Nullable<string>): boolean {
  * @return {*}  {p is Promise<U>}
  */
 export function isPromise<U>(p: any): p is Promise<U> {
-  return p && Object.prototype.toString.call(p) === "[object Promise]";
+    return p && Object.prototype.toString.call(p) === "[object Promise]";
 }
 
 /**
@@ -443,11 +594,16 @@ export function requestFullScreen() {
  *
  * @export
  */
-export function previewAutoFullScreen() {
-    if (PREVIEW && sys.isMobile) {
+export function previewAutoFullScreen(force: boolean = false) {
+    logger.log("尝试预览环境下自动全屏", force);
+
+    if (force || (PREVIEW && sys.isMobile)) {
         if (navigator && navigator.platform && navigator.platform == "Win32") {
+            logger.log("预览环境下，PC平台不自动全屏");
             return;
         }
+
+        logger.log("预览环境下，自动全屏");
         requestFullScreen();
     }
 }
