@@ -100,7 +100,7 @@ export class Container {
         const type = Container._types.get(name);
         if (type) {
             return Container._cast(type as IGameFramework.Constructor<T>);
-        } else { 
+        } else {
             logger.error("Container.getByName: " + name + " not found");
         }
     }
@@ -166,6 +166,9 @@ export class Container {
         instance.onStart(args);
         Container._singletons.add(instance);
 
+        const name = js.getClassName(ctor);
+        Container._registerType(name, ctor);
+
         DEBUG && logger.log("注入实例: " + js.getClassName(instance));
 
         return instance;
@@ -188,6 +191,9 @@ export class Container {
 
         instance = new t();
         Container._otherInstances.set(t, instance);
+
+        const name = js.getClassName(t);
+        Container._registerType(name, t);
 
         DEBUG && logger.log("注入实例: " + js.getClassName(instance));
 
