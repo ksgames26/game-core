@@ -88,6 +88,24 @@ export class Container {
     }
 
     /**
+     * 根据名称获取实例
+     *
+     * @static
+     * @template T
+     * @param {string} name
+     * @return {*}  {IGameFramework.Nullable<T>}
+     * @memberof Container
+     */
+    public static getByName<T>(name: string): IGameFramework.Nullable<T> {
+        const type = Container._types.get(name);
+        if (type) {
+            return Container._cast(type as IGameFramework.Constructor<T>);
+        } else { 
+            logger.error("Container.getByName: " + name + " not found");
+        }
+    }
+
+    /**
      * 如果实力已经注入接口类型
      * 
      * 则可以通过接口获取实例
@@ -210,7 +228,23 @@ export class Container {
      */
     public static registerInjectables() {
         for (let ctor of Container._injectables) {
-            Container.addInstance(ctor as IGameFramework.Constructor<Object>);
+
+            const name = js.getClassName(ctor);
+            Container._registerType(name, ctor);
+
+            const cast = Container._cast(ctor);
+            if (cast) {
+                continue;
+            }
+
+            const instance = new (ctor as IGameFramework.Constructor<IGameFramework.ISingleton>)();
+            if ("onUpdate" in instance && "onStart" in instance) {
+                instance.onStart(null);
+                Container._singletons.add(instance);
+            } else {
+                Container._otherInstances.set(ctor, instance)
+            }
+            DEBUG && logger.log("注入实例: " + js.getClassName(instance));
         }
 
         // 清空所有注册相关的缓存
@@ -230,7 +264,7 @@ export class Container {
         DEBUG && assert(!!iface, `${js.getClassName(ctor)} must implement some interface`);
         DEBUG && assert(Container._types.get(iface) === void 0, `${js.getClassName(ctor)} has been registered`);
 
-        Container._types.set(iface, ctor);
+        Container._registerType(iface, ctor);
     }
 
     /**
@@ -250,9 +284,19 @@ export class Container {
         return new ctor(args);
     }
 
+    private static _registerType(nameOrIface: string, type: IGameFramework.Constructor<unknown>): void {
+        const has = Container._types.get(nameOrIface);
+        if (has) {
+            logger.error("有同名类型多次注入");
+            return;
+        }
+
+        Container._types.set(nameOrIface, type);
+    }
+
     private static _cast<T>(t: IGameFramework.Constructor<T>): IGameFramework.Nullable<T> {
         for (let instance of Container._singletons) {
-            if (instance instanceof t) {
+            if (instance.constructor === t) {
                 return instance as T;
             }
         }
@@ -263,6 +307,5 @@ export class Container {
 
         return null;
     }
-
 }
 
