@@ -1,5 +1,6 @@
 import "cc";
 import { Component, physics } from "cc";
+import { MessageType } from "db://game-protobuf/game-framework";
 
 export { };
 
@@ -704,7 +705,7 @@ declare global {
             get protoId(): string | number;
         }
 
-        /**
+         /**
          * 序列化
          *
          * @interface ISerializable
@@ -718,7 +719,7 @@ declare global {
              * @param {Constructor<T>} clazz
              * @memberof ISerializable
              */
-            registerType<T extends ISerializer>(clazz: Constructor<T>): void;
+            registerType<T extends MessageType<object> & ISerializer>(clazz: Constructor<T>): void;
 
             /**
              * 注入一个可以被序列化和反序列化的对象
@@ -727,7 +728,7 @@ declare global {
              * @param {T} inst
              * @memberof ISerializable
              */
-            registerInst<T extends ISerializer>(inst: T): void;
+            registerInst<T extends MessageType<object> & ISerializer>(inst: T): void;
 
             /**
              * 编码
@@ -737,7 +738,7 @@ declare global {
              * @return {*}  {Uint8Array}
              * @memberof ISerializable
              */
-            encoder<T extends ISerializer>(clazz: T): Uint8Array;
+            encoder<T extends ISerializer>(clazz: T): IGameFramework.Nullable<Uint8Array>;
 
             /**
              * 解码
@@ -748,7 +749,7 @@ declare global {
              * @return {*}  {T}
              * @memberof ISerializable
              */
-            decoder<T extends ISerializer>(id: string | number, buffer: Uint8Array): T;
+            decoder<T extends ISerializer>(id: string | number, buffer: Uint8Array): IGameFramework.Nullable<T>;
 
             /**
              * 获取一个新的json对象而不是类实例
@@ -758,7 +759,26 @@ declare global {
              * @return {*}  {T}
              * @memberof ISerializable
              */
-            create<T extends ISerializer>(id: string | number): T;
+            create<T>(id: string | number): IGameFramework.Nullable<T & ISerializer>;
+
+            /**
+             * 获取一个新的json对象而不是类实例
+             *
+             * @template T
+             * @param {(string | number)} id
+             * @return {*}  {T}
+             * @memberof ISerializable
+             */
+            createByName<T extends IGameFramework.ISerializer>(name: string): IGameFramework.Nullable<T>;
+
+            /**
+             * 根据ID获取名称
+             *
+             * @param {(string | number)} id
+             * @return {*}  {(string | null)}
+             * @memberof ISerializable
+             */
+            getNameById(id: string | number): string | null;
 
             /**
              * 克隆一个对象
@@ -769,7 +789,7 @@ declare global {
              * @return {*}  {T}
              * @memberof ISerializable
              */
-            clone<T>(id: string | number, source: T): T;
+            clone<T>(id: string | number, source: T): IGameFramework.Nullable<T>;
         }
 
         /**
