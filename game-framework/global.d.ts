@@ -625,6 +625,18 @@ declare global {
                 eventName: TEventName
             ): boolean;
 
+            hasListener<TEventName extends Extract<keyof TEventOverview, string>>(
+                eventName: TEventName,
+                listener: IGameFramework.EventListener<TEventOverview[TEventName]>,
+                callee: unknown
+            ): boolean;
+
+            hasListener<TEventName extends string>(
+                eventName: Exclude<TEventName, keyof TEventOverview>,
+                listener: IGameFramework.EventListener<any>,
+                callee: unknown
+            ): boolean;
+
             clearUp(e: string): void;
         }
 
@@ -705,7 +717,7 @@ declare global {
             get protoId(): string | number;
         }
 
-         /**
+        /**
          * 序列化
          *
          * @interface ISerializable
@@ -848,7 +860,7 @@ declare global {
              * @type {boolean}
              * @memberof SpecialShapedScreen
              */
-            fixTop: boolean;
+            fixTop?: boolean;
 
             /**
              * 是否修正底部
@@ -856,14 +868,14 @@ declare global {
              * @type {boolean}
              * @memberof SpecialShapedScreen
              */
-            fixBottom: boolean;
+            fixBottom?: boolean;
 
             /**
              * 是否修正缩放
              * 
              * @todo 暂时不支持 3.8.5 发布以后开始支持
              */
-            fixScaled: boolean;
+            fixScaled?: boolean;
 
             /**
              * 是否修正微信右上角
@@ -871,12 +883,12 @@ declare global {
              * @type {boolean}
              * @memberof SpecialShapedScreen
              */
-            fixWxRightTop: boolean;
+            fixWxRightTop?: boolean;
 
             /**
              * 如果查询不存在的话，可以忽略
              */
-            ignore: boolean;
+            ignore?: boolean;
 
             /**
              * 组件名称
@@ -884,7 +896,7 @@ declare global {
              * @type {string}
              * @memberof SpecialShapedScreen
              */
-            compName: string;
+            compName?: string;
         }
 
         /**
@@ -916,7 +928,7 @@ declare global {
              * @type {number}
              * @memberof PropertypeDefine
              */
-            compIndex: number;
+            compIndex?: number;
         }
 
         /**
