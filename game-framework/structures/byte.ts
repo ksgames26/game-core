@@ -84,7 +84,7 @@ export class Byte {
      * 获取此对象的 ArrayBuffer 数据，数据只包含有效数据部分。
      */
     public get buffer(): ArrayBuffer {
-        let rstBuffer: ArrayBuffer = this._d_.buffer;
+        let rstBuffer: ArrayBuffer = this._d_.buffer as ArrayBuffer;
         if (rstBuffer.byteLength == this.length) return rstBuffer;
         return rstBuffer.slice(0, this.length);
     }
@@ -574,7 +574,7 @@ export class Byte {
      */
     public __getBuffer(): ArrayBuffer {
         // this._d_.buffer.byteLength = this.length;
-        return this._d_.buffer;
+        return this._d_.buffer as ArrayBuffer;
     }
 
     /**
